@@ -8,6 +8,7 @@ defmodule BoidsWeb.Router do
     plug :put_root_layout, html: {BoidsWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug BoidsWeb.Plugs.Locale, "en"
   end
 
   pipeline :api do
@@ -20,6 +21,8 @@ defmodule BoidsWeb.Router do
     get "/", PageController, :home
     get "/hello", HelloController, :index
     get "/hello/:messenger", HelloController, :show
+
+    resources "/users", UserController
   end
 
   # Other scopes may use custom stacks.
