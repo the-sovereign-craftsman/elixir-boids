@@ -2,7 +2,7 @@ defmodule BoidsWeb.Router do
   use BoidsWeb, :router
 
   pipeline :browser do
-    plug :accepts, ["html"]
+    plug :accepts, ["html", "json"]
     plug :fetch_session
     plug :fetch_live_flash
     plug :put_root_layout, html: {BoidsWeb.Layouts, :root}
@@ -21,8 +21,8 @@ defmodule BoidsWeb.Router do
     get "/", PageController, :home
     get "/hello", HelloController, :index
     get "/hello/:messenger", HelloController, :show
+    get "/redirect_test", PageController, :redirect_test
 
-    resources "/users", UserController
   end
 
   # Other scopes may use custom stacks.
