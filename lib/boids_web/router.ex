@@ -26,9 +26,10 @@ defmodule BoidsWeb.Router do
   end
 
   # Other scopes may use custom stacks.
-  # scope "/api", BoidsWeb do
-  #   pipe_through :api
-  # end
+  scope "/api", BoidsWeb do
+    pipe_through :api
+    resources "/urls", UrlController, except: [:new, :edit]
+  end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:boids, :dev_routes) do
