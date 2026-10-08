@@ -21,9 +21,12 @@ defmodule Boids.MixProject do
   def application do
     [
       mod: {Boids.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: extra_applications(Mix.env())
     ]
   end
+
+  defp extra_applications(:dev), do: [:logger, :runtime_tools, :observer, :wx]
+  defp extra_applications(_), do: [:logger, :runtime_tools]
 
   def cli do
     [

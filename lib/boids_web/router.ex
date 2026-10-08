@@ -23,6 +23,8 @@ defmodule BoidsWeb.Router do
     get "/hello/:messenger", HelloController, :show
     get "/redirect_test", PageController, :redirect_test
 
+    live "/thermostat", ThermostatLive
+
   end
 
   # Other scopes may use custom stacks.
