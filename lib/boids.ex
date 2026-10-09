@@ -7,7 +7,14 @@ defmodule Boids do
   if it comes from the database, an external API or others.
   """
 
-  def spawn_boid(args) do
-    DynamicSupervisor.start_child(Boids.DynamicSupervisor, {Boids.Boid, args})
+  @spec spawn_boid() :: :ignore | {:error, any()} | pid()
+  def spawn_boid() do
+    {:ok, pid} = DynamicSupervisor.start_child(Boids.DynamicSupervisor, Boids.Boid)
+    pid
+  end
+
+  @spec spawn_boids(non_neg_integer()) :: [pid()]
+  def spawn_boids(count) do
+    Enum.map(1..count, fn _ -> spawn_boid() end)
   end
 end
