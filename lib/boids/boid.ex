@@ -2,12 +2,12 @@ defmodule Boids.Boid do
   use GenServer
 
   # 30fps
-  @tick_interval_ms 33
+  @tick_interval_ms 200
   @initial_speed 2
-  @world_width 1000
-  @world_height 1000
+  @world_width 1000.0
+  @world_height 1000.0
 
-  @world_arena %{top: 0, left: 0, width: @world_width, height: @world_height}
+  @world_arena %{top: 0.0, left: 0.0, width: @world_width, height: @world_height}
 
   @type t :: %__MODULE__{
     position: {float(), float()},
@@ -25,13 +25,16 @@ defmodule Boids.Boid do
     IO.puts("Inside Boid.init/1")
 
     boid = %__MODULE__{position: random_position(), velocity: random_velocity()}
+    IO.inspect(boid, label: "boid after random position generation")
     Process.send_after(self(), :tick, @tick_interval_ms)
     {:ok, boid}
   end
 
   def handle_info(:tick, %__MODULE__{} = boid) do
     Process.send_after(self(), :tick, @tick_interval_ms)
-    {:noreply, advance_boid(boid)}
+    new_boid = advance_boid(boid)
+    IO.inspect(new_boid, label: "new boid after clamping")
+    {:noreply, new_boid}
   end
 
 
