@@ -3,4 +3,5 @@ defmodule BoidsWeb.PageJSON do
     %{message: "This is some JSON"}
   end
 end
+
 4

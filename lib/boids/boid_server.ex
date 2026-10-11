@@ -1,8 +1,6 @@
 defmodule Boids.BoidServer do
   use GenServer
 
-  alias Boids.Boid
-
   @tick_interval_ms 200
 
   def start_link(_opts) do

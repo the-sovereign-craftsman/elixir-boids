@@ -8,9 +8,9 @@ defmodule Boids.Boid do
   @world_arena %{top: 0.0, left: 0.0, width: @world_width, height: @world_height}
 
   @type t :: %__MODULE__{
-    position: {float(), float()},
-    velocity: {float(), float()},
-  }
+          position: {float(), float()},
+          velocity: {float(), float()}
+        }
 
   @enforce_keys [:position, :velocity]
   defstruct [:position, :velocity]
@@ -33,8 +33,12 @@ defmodule Boids.Boid do
     {{x, y}, {dx, dy}}
   end
 
-  defp clamp_axis(pos, delta, min_boundary, _max_boundary) when pos < min_boundary, do: {min_boundary, -delta}
-  defp clamp_axis(pos, delta, _min_boundary, max_boundary) when pos > max_boundary, do: {max_boundary, -delta}
+  defp clamp_axis(pos, delta, min_boundary, _max_boundary) when pos < min_boundary,
+    do: {min_boundary, -delta}
+
+  defp clamp_axis(pos, delta, _min_boundary, max_boundary) when pos > max_boundary,
+    do: {max_boundary, -delta}
+
   defp clamp_axis(pos, delta, _min_boundary, _max_boundary), do: {pos, delta}
 
   defp random_position do

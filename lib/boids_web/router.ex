@@ -24,7 +24,6 @@ defmodule BoidsWeb.Router do
     get "/redirect_test", PageController, :redirect_test
 
     live "/thermostat", ThermostatLive
-
   end
 
   # Other scopes may use custom stacks.
