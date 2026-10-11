@@ -10,9 +10,9 @@ defmodule Boids.UrlsTest do
 
     @invalid_attrs %{link: nil, title: nil}
 
-    test "list_url/0 returns all url" do
+    test "list_urls/0 returns all url" do
       url = url_fixture()
-      assert Urls.list_url() == [url]
+      assert Urls.list_urls() == [url]
     end
 
     test "get_url!/1 returns the url with given id" do

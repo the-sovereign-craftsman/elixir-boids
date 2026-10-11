@@ -3,11 +3,9 @@ defmodule Boids.BoidTest do
 
   alias Boids.Boid
 
-  describe "init/1" do
-    test "starts with a random position inside the world bounds and velocity at the expected speed" do
-      pid = start_supervised!({Boid, []})
-
-      %Boid{position: {x, y}, velocity: {dx, dy}} = :sys.get_state(pid)
+  describe "new/0" do
+    test "returns a boid with position inside the world bounds and velocity at the expected speed" do
+      %Boid{position: {x, y}, velocity: {dx, dy}} = Boid.new()
 
       assert x >= 0 and x < 1000
       assert y >= 0 and y < 1000
@@ -15,32 +13,41 @@ defmodule Boids.BoidTest do
     end
   end
 
-  describe "handle_info/2" do
+  describe "advance_boid/1" do
     test "advances position by velocity when the result stays within bounds" do
-      pid = start_supervised!({Boid, []})
-      :sys.replace_state(pid, fn _ -> %Boid{position: {10.0, 10.0}, velocity: {5.0, 5.0}} end)
+      boid = %Boid{position: {10.0, 10.0}, velocity: {5.0, 5.0}}
 
-      send(pid, :tick)
-
-      assert :sys.get_state(pid) == %Boid{position: {15.0, 15.0}, velocity: {5.0, 5.0}}
+      assert Boid.advance_boid(boid) == %Boid{position: {15.0, 15.0}, velocity: {5.0, 5.0}}
     end
 
-    test "clamps position and reverses velocity when crossing the right/bottom boundary" do
-      pid = start_supervised!({Boid, []})
-      :sys.replace_state(pid, fn _ -> %Boid{position: {999.0, 500.0}, velocity: {5.0, 0.0}} end)
+    test "clamps position and reverses velocity when crossing the right boundary" do
+      boid = %Boid{position: {999.0, 500.0}, velocity: {5.0, 0.0}}
 
-      send(pid, :tick)
-
-      assert :sys.get_state(pid) == %Boid{position: {1000.0, 500.0}, velocity: {-5.0, 0.0}}
+      assert Boid.advance_boid(boid) == %Boid{position: {1000.0, 500.0}, velocity: {-5.0, 0.0}}
     end
 
-    test "clamps position and reverses velocity when crossing the left/top boundary" do
-      pid = start_supervised!({Boid, []})
-      :sys.replace_state(pid, fn _ -> %Boid{position: {1.0, 1.0}, velocity: {-5.0, -5.0}} end)
+    test "clamps position and reverses velocity when crossing the left boundary" do
+      boid = %Boid{position: {1.0, 500.0}, velocity: {-5.0, 0.0}}
 
-      send(pid, :tick)
+      assert Boid.advance_boid(boid) == %Boid{position: {0.0, 500.0}, velocity: {5.0, 0.0}}
+    end
 
-      assert :sys.get_state(pid) == %Boid{position: {0.0, 0.0}, velocity: {5.0, 5.0}}
+    test "clamps position and reverses velocity when crossing the top boundary" do
+      boid = %Boid{position: {500.0, 1.0}, velocity: {0.0, -5.0}}
+
+      assert Boid.advance_boid(boid) == %Boid{position: {500.0, 0.0}, velocity: {0.0, 5.0}}
+    end
+
+    test "clamps position and reverses velocity when crossing the bottom boundary" do
+      boid = %Boid{position: {500.0, 999.0}, velocity: {0.0, 5.0}}
+
+      assert Boid.advance_boid(boid) == %Boid{position: {500.0, 1000.0}, velocity: {0.0, -5.0}}
+    end
+
+    test "clamps both axes independently when both cross a boundary in the same tick" do
+      boid = %Boid{position: {1.0, 1.0}, velocity: {-5.0, -5.0}}
+
+      assert Boid.advance_boid(boid) == %Boid{position: {0.0, 0.0}, velocity: {5.0, 5.0}}
     end
   end
 end
