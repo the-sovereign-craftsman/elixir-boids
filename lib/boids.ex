@@ -9,7 +9,7 @@ defmodule Boids do
 
   @spec spawn_boid() :: :ignore | {:error, any()} | pid()
   def spawn_boid() do
-    {:ok, pid} = DynamicSupervisor.start_child(Boids.DynamicSupervisor, Boids.Boid)
+    {:ok, pid} = DynamicSupervisor.start_child(Boids.DynamicSupervisor, Boids.BoidServer)
     pid
   end
 

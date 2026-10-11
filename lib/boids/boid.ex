@@ -1,8 +1,6 @@
 defmodule Boids.Boid do
-  use GenServer
+  @behaviour Boids.BoidBehaviour
 
-  # 30fps
-  @tick_interval_ms 200
   @initial_speed 2
   @world_width 1000.0
   @world_height 1000.0
@@ -17,28 +15,11 @@ defmodule Boids.Boid do
   @enforce_keys [:position, :velocity]
   defstruct [:position, :velocity]
 
-  def start_link(_opts) do
-    GenServer.start_link(__MODULE__, :ok)
+  def new() do
+    %__MODULE__{position: random_position(), velocity: random_velocity()}
   end
 
-  def init(:ok) do
-    IO.puts("Inside Boid.init/1")
-
-    boid = %__MODULE__{position: random_position(), velocity: random_velocity()}
-    IO.inspect(boid, label: "boid after random position generation")
-    Process.send_after(self(), :tick, @tick_interval_ms)
-    {:ok, boid}
-  end
-
-  def handle_info(:tick, %__MODULE__{} = boid) do
-    Process.send_after(self(), :tick, @tick_interval_ms)
-    new_boid = advance_boid(boid)
-    IO.inspect(new_boid, label: "new boid after clamping")
-    {:noreply, new_boid}
-  end
-
-
-  defp advance_boid(%__MODULE__{position: {x, y}, velocity: {dx, dy}}) do
+  def advance_boid(%__MODULE__{position: {x, y}, velocity: {dx, dy}}) do
     new_x_pos = x + dx
     new_y_pos = y + dy
 
