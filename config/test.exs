@@ -23,6 +23,8 @@ config :boids, BoidsWeb.Endpoint,
 # In test we don't send emails
 config :boids, Boids.Mailer, adapter: Swoosh.Adapters.Test
 
+config :boids, :boid_module, Boids.BoidMock
+
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false
 

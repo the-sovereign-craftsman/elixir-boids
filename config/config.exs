@@ -36,6 +36,8 @@ config :phoenix_live_view,
 # at the `config/runtime.exs`.
 config :boids, Boids.Mailer, adapter: Swoosh.Adapters.Local
 
+config :boids, boid_module: Boids.Boid
+
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
