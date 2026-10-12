@@ -9,6 +9,7 @@ defmodule Boids.BoidPositions do
     GenServer.start_link(__MODULE__, :ok)
   end
 
+  @impl true
   def init(:ok) do
     :ets.new(@table_name, [
       :set,
