@@ -2,13 +2,12 @@ defmodule BoidsWeb.Router do
   use BoidsWeb, :router
 
   pipeline :browser do
-    plug :accepts, ["html", "json"]
+    plug :accepts, ["html"]
     plug :fetch_session
     plug :fetch_live_flash
     plug :put_root_layout, html: {BoidsWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
-    plug BoidsWeb.Plugs.Locale, "en"
   end
 
   pipeline :api do
@@ -19,18 +18,13 @@ defmodule BoidsWeb.Router do
     pipe_through :browser
 
     live "/", BoidsSimulationLive
-    get "/hello", HelloController, :index
-    get "/hello/:messenger", HelloController, :show
-    get "/redirect_test", PageController, :redirect_test
-
-    live "/thermostat", ThermostatLive
     live "/boids", BoidsSimulationLive
   end
 
   # Other scopes may use custom stacks.
-  scope "/api", BoidsWeb do
-    pipe_through :api
-  end
+  # scope "/api", BoidsWeb do
+  #   pipe_through :api
+  # end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:boids, :dev_routes) do

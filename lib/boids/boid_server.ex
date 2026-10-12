@@ -3,7 +3,7 @@ defmodule Boids.BoidServer do
 
   alias Boids.BoidPositions
 
-  @tick_interval_ms 200
+  @tick_interval_ms 33
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, :ok)
