@@ -18,12 +18,13 @@ defmodule BoidsWeb.Router do
   scope "/", BoidsWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", BoidsSimulationLive
     get "/hello", HelloController, :index
     get "/hello/:messenger", HelloController, :show
     get "/redirect_test", PageController, :redirect_test
 
     live "/thermostat", ThermostatLive
+    live "/boids", BoidsSimulationLive
   end
 
   # Other scopes may use custom stacks.

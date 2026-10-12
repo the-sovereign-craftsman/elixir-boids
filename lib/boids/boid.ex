@@ -1,7 +1,7 @@
 defmodule Boids.Boid do
   @behaviour Boids.BoidBehaviour
 
-  @initial_speed 2
+  @initial_speed 10
   @world_width 1000.0
   @world_height 1000.0
 
