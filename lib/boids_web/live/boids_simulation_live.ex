@@ -49,7 +49,8 @@ defmodule BoidsWeb.BoidsSimulationLive do
 
   @impl true
   def handle_info(:render_frame, socket) do
-    positions = Enum.map(Boids.list_boid_positions(), fn {_pid, %Boid{position: {x, y}}} -> [x, y] end)
+    positions =
+      Enum.map(Boids.list_boid_positions(), fn {_pid, %Boid{position: {x, y}}} -> [x, y] end)
 
     Process.send_after(self(), :render_frame, @frame_interval_ms)
 

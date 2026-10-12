@@ -10,10 +10,14 @@ defmodule Boids.BoidPositions do
   end
 
   def init(:ok) do
-    :ets.new(@table_name, [:set, :public, :named_table, write_concurrency: true, read_concurrency: true])
+    :ets.new(@table_name, [
+      :set,
+      :public,
+      :named_table,
+      write_concurrency: true,
+      read_concurrency: true
+    ])
 
     {:ok, @table_name}
   end
-
-
 end
