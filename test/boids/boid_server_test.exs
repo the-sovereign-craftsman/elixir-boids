@@ -10,6 +10,9 @@ defmodule Boids.BoidServerTest do
 
   setup :verify_on_exit!
 
+  # BoidServer resolves its boid module from Application.get_env(:boids, :boid_module),
+  # which config/test.exs sets to BoidMock (defined in test/test_helper.exs).
+
   describe "init/1" do
     test "delegates to the configured boid_module to build the initial state" do
       initial_boid = %Boid{position: {0.0, 0.0}, velocity: {0.0, 0.0}}

@@ -26,5 +26,6 @@ defmodule Boids.BoidServer do
     {:noreply, new_boid}
   end
 
+  # DI to allow us to mock boid module from our tests
   defp boid_module(), do: Application.get_env(:boids, :boid_module)
 end
