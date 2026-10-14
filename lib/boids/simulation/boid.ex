@@ -2,10 +2,8 @@ defmodule Boids.Boid do
   @behaviour Boids.BoidBehaviour
 
   @initial_speed 2
-  @world_width 1000.0
-  @world_height 1000.0
 
-  @world_arena %{top: 0.0, left: 0.0, width: @world_width, height: @world_height}
+  @world_arena Boids.World.world_arena()
 
   @type t :: %__MODULE__{
           position: {float(), float()},
