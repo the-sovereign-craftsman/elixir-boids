@@ -20,11 +20,10 @@ mix test test/path/to_test.exs           # run a single file
 mix test test/path/to_test.exs:42        # run a single test at a line
 mix test --failed                        # re-run only previously failed tests
 
-mix precommit   # compile --warnings-as-errors, deps.unlock --unused, format, test — run before finishing any change
+mix precommit   # compile --warnings-as-errors, deps.unlock --unused, format, credo --strict, test — run before finishing any change
 mix format      # format only
+mix credo --strict   # lint only (config in .credo.exs)
 ```
-
-There is no separate lint task beyond `mix format` and `compile --warnings-as-errors`, both covered by `mix precommit`.
 
 ## Architecture
 

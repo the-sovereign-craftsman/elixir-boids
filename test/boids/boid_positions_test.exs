@@ -10,7 +10,7 @@ defmodule Boids.BoidPositionsTest do
   describe "table" do
     test "is a named :set table" do
       assert :ets.info(BoidPositions.table_name(), :named_table) == true
-      assert :ets.info(BoidPositions.table_name(), :type) == :set
+      assert :ets.info(BoidPositions.table_name(), :type) == :ordered_set
     end
 
     test "is writable from a process other than its owner" do

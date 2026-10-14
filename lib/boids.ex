@@ -9,7 +9,7 @@ defmodule Boids do
   alias Boids.BoidPositions
 
   @spec spawn_boid() :: pid()
-  def spawn_boid() do
+  def spawn_boid do
     {:ok, pid} = DynamicSupervisor.start_child(Boids.DynamicSupervisor, Boids.BoidServer)
     pid
   end
@@ -20,7 +20,7 @@ defmodule Boids do
   end
 
   @spec list_boid_positions() :: [{pid(), Boids.Boid.t()}]
-  def list_boid_positions() do
+  def list_boid_positions do
     :ets.tab2list(BoidPositions.table_name())
   end
 end

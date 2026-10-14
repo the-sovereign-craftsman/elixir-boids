@@ -1,4 +1,13 @@
 defmodule Boids.Boid do
+  @moduledoc """
+  Pure domain model of a single boid: its position and velocity, and how it
+  moves one step.
+
+  Contains no processes or state. `Boids.BoidServer` holds a `%Boid{}` and
+  calls `advance_boid/1` on every tick. Boids that reach the edge of the
+  `Boids.World` arena are clamped to the wall and bounce back.
+  """
+
   @behaviour Boids.BoidBehaviour
 
   @initial_speed 2
@@ -13,7 +22,7 @@ defmodule Boids.Boid do
   @enforce_keys [:position, :velocity]
   defstruct [:position, :velocity]
 
-  def new() do
+  def new do
     %__MODULE__{position: random_position(), velocity: random_velocity()}
   end
 

@@ -1,4 +1,16 @@
 defmodule Boids.BoidSpatialGrid do
+  @moduledoc """
+  Pure math for dividing the world into a uniform grid of square cells, so
+  neighbor searches only look at nearby boids instead of all of them.
+
+  A position maps to the cell containing it, and a cell maps to the block of
+  up to 9 cells (itself plus 8 neighbors, clipped at the world edges) that a
+  neighbor search must cover. The cell size must be at least the neighbor
+  radius, so that block is guaranteed to contain every possible neighbor.
+
+  Depends only on `Boids.World` for the grid bounds.
+  """
+
   @spatial_grid_cell_size 50
   @neighbor_offsets for dx <- -1..1, dy <- -1..1, do: {dx, dy}
   @max_cell_x trunc(Boids.World.world_arena().width / @spatial_grid_cell_size)
@@ -8,7 +20,7 @@ defmodule Boids.BoidSpatialGrid do
   @type cell :: {integer(), integer()}
 
   @spec cell_size() :: pos_integer()
-  def cell_size(), do: @spatial_grid_cell_size
+  def cell_size, do: @spatial_grid_cell_size
 
   @doc """
   Returns the `{cell_x, cell_y}` cell containing `position`.

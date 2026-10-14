@@ -1,6 +1,8 @@
 defmodule BoidsWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :boids
 
+  require Logger
+
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
   # Set :encryption_salt if you would also like to encrypt it.
@@ -55,7 +57,7 @@ defmodule BoidsWeb.Endpoint do
   plug BoidsWeb.Router
 
   def introspect(conn, _opts) do
-    IO.puts("""
+    Logger.debug("""
     Verb: #{inspect(conn.method)}
     Host: #{inspect(conn.host)}
     Headers: #{inspect(conn.req_headers)}
