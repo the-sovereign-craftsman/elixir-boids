@@ -25,6 +25,9 @@ config :boids, Boids.Mailer, adapter: Swoosh.Adapters.Test
 
 config :boids, :boid_module, Boids.BoidMock
 
+# No timer-driven ticks in tests; tests send :tick themselves so they stay deterministic.
+config :boids, :tick_interval_ms, :manual
+
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false
 

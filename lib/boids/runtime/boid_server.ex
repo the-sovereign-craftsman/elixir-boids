@@ -17,8 +17,6 @@ defmodule Boids.BoidServer do
   alias Boids.BoidPositions
   alias Boids.BoidSpatialGrid
 
-  @tick_interval_ms 33
-
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, :ok)
   end
@@ -30,7 +28,7 @@ defmodule Boids.BoidServer do
 
     :ets.insert(BoidPositions.table_name(), {{cell_x, cell_y, self()}, boid})
 
-    Process.send_after(self(), :tick, @tick_interval_ms)
+    schedule_tick()
     {:ok, boid}
   end
 
@@ -46,8 +44,16 @@ defmodule Boids.BoidServer do
       :ets.delete(BoidPositions.table_name(), {old_cell_x, old_cell_y, self()})
     end
 
-    Process.send_after(self(), :tick, @tick_interval_ms)
+    schedule_tick()
     {:noreply, new_boid}
+  end
+
+  # :manual (set in config/test.exs) skips the timer so tests control every tick.
+  defp schedule_tick do
+    case Application.fetch_env!(:boids, :tick_interval_ms) do
+      :manual -> :ok
+      interval_ms -> Process.send_after(self(), :tick, interval_ms)
+    end
   end
 
   # DI to allow us to mock boid module from our tests

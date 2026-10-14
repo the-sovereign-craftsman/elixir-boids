@@ -38,6 +38,10 @@ config :boids, Boids.Mailer, adapter: Swoosh.Adapters.Local
 
 config :boids, boid_module: Boids.Boid
 
+# How often each BoidServer advances its boid. `:manual` disables the timer
+# so ticks only happen when sent explicitly (used in tests).
+config :boids, tick_interval_ms: 33
+
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
