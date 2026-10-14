@@ -16,7 +16,8 @@ defmodule BoidsWeb.BoidsSimulationLiveTest do
 
   describe "handle_info/2 :render_frame" do
     test "pushes boid positions from the table as [x, y] lists", %{conn: conn} do
-      key = make_ref()
+      # Real row shape; a ref stands in for the pid so the key is unique in the shared table.
+      key = {0, 0, make_ref()}
       boid = %Boid{position: {12.0, 34.0}, velocity: {1.0, 1.0}}
 
       :ets.insert(BoidPositions.table_name(), {key, boid})

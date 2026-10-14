@@ -6,7 +6,8 @@ defmodule BoidsTest do
 
   describe "list_boid_positions/0" do
     test "returns rows written to the positions table" do
-      key = make_ref()
+      # Real row shape; a ref stands in for the pid so the key is unique in the shared table.
+      key = {0, 0, make_ref()}
       boid = %Boid{position: {12.0, 34.0}, velocity: {1.0, 1.0}}
 
       :ets.insert(BoidPositions.table_name(), {key, boid})
