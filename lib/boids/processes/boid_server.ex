@@ -16,6 +16,7 @@ defmodule Boids.BoidServer do
 
   alias Boids.BoidPositions
   alias Boids.BoidSpatialGrid
+  alias Boids.BoidFlockingConfig
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, :ok)
@@ -35,7 +36,21 @@ defmodule Boids.BoidServer do
   @impl true
   def handle_info(:tick, boid) do
     {old_cell_x, old_cell_y} = old_cell = BoidSpatialGrid.cell_for_position(boid.position)
-    new_boid = boid_module().advance_boid(boid)
+
+    # Look up neighbors and filter based on perception radius
+    neighbors =
+      BoidPositions.boids_within_radius(
+        boid.position,
+        BoidFlockingConfig.boid_perception_radius(),
+        self()
+      )
+
+    # Advance boid based on those neighbor averages
+    # Separation
+    # Cohesion
+    # Alignment
+    # This will happen inside advance_boid
+    new_boid = boid_module().advance_boid(boid, neighbors)
     {new_cell_x, new_cell_y} = new_cell = BoidSpatialGrid.cell_for_position(new_boid.position)
 
     :ets.insert(BoidPositions.table_name(), {{new_cell_x, new_cell_y, self()}, new_boid})

@@ -8,10 +8,12 @@ defmodule Boids.BoidSpatialGrid do
   neighbor search must cover. The cell size must be at least the neighbor
   radius, so that block is guaranteed to contain every possible neighbor.
 
-  Depends only on `Boids.World` for the grid bounds.
+  Depends on `Boids.World` for the grid bounds and Boids.BoidFlockingConfig for the perception radius.
   """
 
-  @spatial_grid_cell_size 50
+  alias Boids.BoidFlockingConfig
+
+  @spatial_grid_cell_size BoidFlockingConfig.boid_perception_radius()
   @neighbor_offsets for dx <- -1..1, dy <- -1..1, do: {dx, dy}
   @max_cell_x trunc(Boids.World.world_arena().width / @spatial_grid_cell_size)
   @max_cell_y trunc(Boids.World.world_arena().height / @spatial_grid_cell_size)

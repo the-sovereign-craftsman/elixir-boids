@@ -11,5 +11,5 @@ defmodule Boids.BoidBehaviour do
 
   @callback new() :: Boid.t()
 
-  @callback advance_boid(Boid.t()) :: Boid.t()
+  @callback advance_boid(Boid.t(), [Boid.t()]) :: Boid.t()
 end

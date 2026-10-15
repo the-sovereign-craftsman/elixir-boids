@@ -4,14 +4,13 @@ defmodule Boids.Boid do
   moves one step.
 
   Contains no processes or state. `Boids.BoidServer` holds a `%Boid{}` and
-  calls `advance_boid/1` on every tick. Boids that reach the edge of the
+  calls `advance_boid/2` on every tick. Boids that reach the edge of the
   `Boids.World` arena are clamped to the wall and bounce back.
   """
 
   @behaviour Boids.BoidBehaviour
 
   @initial_speed 2
-
   @world_arena Boids.World.world_arena()
 
   @type t :: %__MODULE__{
@@ -26,7 +25,11 @@ defmodule Boids.Boid do
     %__MODULE__{position: random_position(), velocity: random_velocity()}
   end
 
-  def advance_boid(%__MODULE__{position: {x, y}, velocity: {dx, dy}}) do
+  @spec advance_boid(Boids.Boid.t(), [Boids.Boid.t()]) :: Boids.Boid.t()
+  def advance_boid(
+        %__MODULE__{position: {x, y}, velocity: {dx, dy}},
+        neighbors
+      ) do
     new_x_pos = x + dx
     new_y_pos = y + dy
 
