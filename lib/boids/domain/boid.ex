@@ -12,9 +12,11 @@ defmodule Boids.Boid do
 
   alias Boids.BoidFlockingConfig
 
-  @initial_speed 2
   @world_arena Boids.World.world_arena()
   @separation_radius_squared BoidFlockingConfig.boid_separation_radius() ** 2
+  @boid_max_speed BoidFlockingConfig.boid_max_speed()
+  @boid_min_speed BoidFlockingConfig.boid_min_speed()
+  @boid_separation_weight BoidFlockingConfig.boid_separation_weight()
 
   @type t :: %__MODULE__{
           position: {float(), float()},
@@ -30,22 +32,37 @@ defmodule Boids.Boid do
 
   @spec advance_boid(Boids.Boid.t(), [Boids.Boid.t()]) :: Boids.Boid.t()
   def advance_boid(
-        %__MODULE__{position: {x, y}, velocity: {dx, dy}} = boid,
+        %__MODULE__{
+          position: {current_x_pos, current_y_pos},
+          velocity: {current_x_velocity, current_y_velocity}
+        } = boid,
         neighbors
       ) do
-    # First phase, we need to execute the flocking algos to find our steering vectors.
-    # Advance boid based on those neighbor averages
-    # Separation
-    # Cohesion
-    # Alignment
+    {separation_x, separation_y} = separation_steering_vector(boid, neighbors)
+    separation_x_weighted = separation_x * @boid_separation_weight
+    separation_y_weighted = separation_y * @boid_separation_weight
 
-    # second phase, calculate new position based on composit steering vector.
-    _separation_steering = separation_steering_vector(boid, neighbors)
+    cohesion_x_weighted = 0
+    cohesion_y_weighted = 0
 
-    new_x_pos = x + dx
-    new_y_pos = y + dy
+    alignment_x_weighted = 0
+    alignment_y_weighted = 0
 
-    {position, velocity} = clamp_to_arena({new_x_pos, new_y_pos}, {dx, dy})
+    steered_x_velocity = separation_x_weighted + cohesion_x_weighted + alignment_x_weighted
+    steered_y_velocity = separation_y_weighted + cohesion_y_weighted + alignment_y_weighted
+
+    composite_x_velocity = steered_x_velocity + current_x_velocity
+    composite_y_velocity = steered_y_velocity + current_y_velocity
+
+    {final_x_velocity, final_y_velocity} =
+      limit_speed({composite_x_velocity, composite_y_velocity})
+
+    new_x_pos = current_x_pos + final_x_velocity
+    new_y_pos = current_y_pos + final_y_velocity
+
+    {position, velocity} =
+      clamp_to_arena({new_x_pos, new_y_pos}, {final_x_velocity, final_y_velocity})
+
     %__MODULE__{position: position, velocity: velocity}
   end
 
@@ -90,6 +107,27 @@ defmodule Boids.Boid do
 
   defp random_velocity do
     angle = :rand.uniform() * 2 * :math.pi()
-    {@initial_speed * :math.cos(angle), @initial_speed * :math.sin(angle)}
+
+    {BoidFlockingConfig.boid_initial_speed() * :math.cos(angle),
+     BoidFlockingConfig.boid_initial_speed() * :math.sin(angle)}
+  end
+
+  # Take the current speed as a proportion of the max or min speeds, and scale each axis up or down accordingly.
+  defp limit_speed({dx, dy}) do
+    speed = :math.sqrt(dx * dx + dy * dy)
+
+    cond do
+      speed == 0 ->
+        {dx, dy}
+
+      speed > @boid_max_speed ->
+        {dx * @boid_max_speed / speed, dy * @boid_max_speed / speed}
+
+      speed < @boid_min_speed ->
+        {dx * @boid_min_speed / speed, dy * @boid_min_speed / speed}
+
+      true ->
+        {dx, dy}
+    end
   end
 end
