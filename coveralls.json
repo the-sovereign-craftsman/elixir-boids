@@ -1,0 +1,17 @@
+{
+  "skip_files": [
+    "test/support/",
+    "lib/boids/application.ex",
+    "lib/boids/mailer.ex",
+    "lib/boids/repo.ex",
+    "lib/boids_web.ex",
+    "lib/boids_web/components/core_components.ex",
+    "lib/boids_web/components/layouts.ex",
+    "lib/boids_web/controllers/error_html.ex",
+    "lib/boids_web/controllers/error_json.ex",
+    "lib/boids_web/endpoint.ex",
+    "lib/boids_web/gettext.ex",
+    "lib/boids_web/router.ex",
+    "lib/boids_web/telemetry.ex"
+  ]
+}

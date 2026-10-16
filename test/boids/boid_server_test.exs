@@ -44,7 +44,7 @@ defmodule Boids.BoidServerTest do
       advanced_boid = %Boid{position: {1.0, 1.0}, velocity: {1.0, 1.0}}
 
       expect(BoidMock, :new, fn -> initial_boid end)
-      expect(BoidMock, :advance_boid, fn ^initial_boid -> advanced_boid end)
+      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors -> advanced_boid end)
 
       pid = start_supervised!({BoidServer, []})
       send(pid, :tick)
@@ -57,7 +57,7 @@ defmodule Boids.BoidServerTest do
       advanced_boid = %Boid{position: {1.0, 1.0}, velocity: {1.0, 1.0}}
 
       expect(BoidMock, :new, fn -> initial_boid end)
-      expect(BoidMock, :advance_boid, fn ^initial_boid -> advanced_boid end)
+      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors -> advanced_boid end)
 
       pid = start_supervised!({BoidServer, []})
       send(pid, :tick)
@@ -78,7 +78,7 @@ defmodule Boids.BoidServerTest do
       advanced_boid = %Boid{position: {20.0, 10.0}, velocity: {10.0, 0.0}}
 
       expect(BoidMock, :new, fn -> initial_boid end)
-      expect(BoidMock, :advance_boid, fn ^initial_boid -> advanced_boid end)
+      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors -> advanced_boid end)
 
       pid = start_supervised!({BoidServer, []})
       send(pid, :tick)
@@ -93,7 +93,7 @@ defmodule Boids.BoidServerTest do
       advanced_boid = %Boid{position: {60.0, 10.0}, velocity: {20.0, 0.0}}
 
       expect(BoidMock, :new, fn -> initial_boid end)
-      expect(BoidMock, :advance_boid, fn ^initial_boid -> advanced_boid end)
+      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors -> advanced_boid end)
 
       pid = start_supervised!({BoidServer, []})
       assert rows_for(pid) == [{{0, 0, pid}, initial_boid}]
@@ -113,9 +113,9 @@ defmodule Boids.BoidServerTest do
       boid_3 = %Boid{position: {40.0, 60.0}, velocity: {0.0, 0.0}}
 
       expect(BoidMock, :new, fn -> boid_0 end)
-      expect(BoidMock, :advance_boid, fn ^boid_0 -> boid_1 end)
-      expect(BoidMock, :advance_boid, fn ^boid_1 -> boid_2 end)
-      expect(BoidMock, :advance_boid, fn ^boid_2 -> boid_3 end)
+      expect(BoidMock, :advance_boid, fn ^boid_0, _neighbors -> boid_1 end)
+      expect(BoidMock, :advance_boid, fn ^boid_1, _neighbors -> boid_2 end)
+      expect(BoidMock, :advance_boid, fn ^boid_2, _neighbors -> boid_3 end)
 
       pid = start_supervised!({BoidServer, []})
 
@@ -139,6 +139,62 @@ defmodule Boids.BoidServerTest do
       assert rows_for(pid_a) == [{{0, 0, pid_a}, boid_a}]
       assert rows_for(pid_b) == [{{0, 0, pid_b}, boid_b}]
     end
+  end
+
+  describe "handle_info/2 neighbor lookup" do
+    # These tests use their own regions of the world (x ~725-925, y ~825-975) so
+    # rows from other async tests sharing the table can't land in their searches.
+
+    test "passes the boids within its perception radius to advance_boid, excluding itself and far boids" do
+      initial_boid = %Boid{position: {725.0, 825.0}, velocity: {0.0, 0.0}}
+      near_boid = insert_boid_row({735.0, 825.0})
+      _far_boid = insert_boid_row({725.0, 975.0})
+
+      test_pid = self()
+      expect(BoidMock, :new, fn -> initial_boid end)
+
+      expect(BoidMock, :advance_boid, fn ^initial_boid, neighbors ->
+        send(test_pid, {:neighbors_passed_to_advance_boid, neighbors})
+        initial_boid
+      end)
+
+      pid = start_supervised!({BoidServer, []})
+      send(pid, :tick)
+
+      # The server's own row is at the center of the search, so this also proves it excludes itself.
+      assert_receive {:neighbors_passed_to_advance_boid, neighbors}
+      assert neighbors == [near_boid]
+    end
+
+    test "passes an empty list when no other boid is within its perception radius" do
+      initial_boid = %Boid{position: {925.0, 825.0}, velocity: {0.0, 0.0}}
+
+      test_pid = self()
+      expect(BoidMock, :new, fn -> initial_boid end)
+
+      expect(BoidMock, :advance_boid, fn ^initial_boid, neighbors ->
+        send(test_pid, {:neighbors_passed_to_advance_boid, neighbors})
+        initial_boid
+      end)
+
+      pid = start_supervised!({BoidServer, []})
+      send(pid, :tick)
+
+      assert_receive {:neighbors_passed_to_advance_boid, []}
+    end
+  end
+
+  # Inserts a row shaped exactly like BoidServer's, owned by a fresh ref standing in
+  # for another boid's pid, and removes it after the test.
+  defp insert_boid_row(position) do
+    {cell_x, cell_y} = BoidSpatialGrid.cell_for_position(position)
+    key = {cell_x, cell_y, make_ref()}
+    boid = %Boid{position: position, velocity: {0.0, 0.0}}
+
+    :ets.insert(BoidPositions.table_name(), {key, boid})
+    on_exit(fn -> :ets.delete(BoidPositions.table_name(), key) end)
+
+    boid
   end
 
   # Every row belonging to `pid`, in any cell. A full-table match is fine in tests;

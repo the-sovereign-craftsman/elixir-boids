@@ -14,9 +14,9 @@ defmodule Boids.BoidServer do
 
   use GenServer
 
+  alias Boids.BoidFlockingConfig
   alias Boids.BoidPositions
   alias Boids.BoidSpatialGrid
-  alias Boids.BoidFlockingConfig
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, :ok)

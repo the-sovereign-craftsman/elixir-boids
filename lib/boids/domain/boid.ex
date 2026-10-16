@@ -28,7 +28,7 @@ defmodule Boids.Boid do
   @spec advance_boid(Boids.Boid.t(), [Boids.Boid.t()]) :: Boids.Boid.t()
   def advance_boid(
         %__MODULE__{position: {x, y}, velocity: {dx, dy}},
-        neighbors
+        _neighbors
       ) do
     new_x_pos = x + dx
     new_y_pos = y + dy
