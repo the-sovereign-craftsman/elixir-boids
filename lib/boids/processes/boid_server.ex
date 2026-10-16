@@ -45,11 +45,6 @@ defmodule Boids.BoidServer do
         self()
       )
 
-    # Advance boid based on those neighbor averages
-    # Separation
-    # Cohesion
-    # Alignment
-    # This will happen inside advance_boid
     new_boid = boid_module().advance_boid(boid, neighbors)
     {new_cell_x, new_cell_y} = new_cell = BoidSpatialGrid.cell_for_position(new_boid.position)
 
