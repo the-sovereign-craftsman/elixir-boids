@@ -32,6 +32,12 @@ defmodule Boids.BoidFlockingConfigTest do
     end
   end
 
+  describe "boid_cohesion_weight/0" do
+    test "is positive, so cohesion pulls boids together rather than apart" do
+      assert BoidFlockingConfig.boid_cohesion_weight() > 0
+    end
+  end
+
   describe "speed limits" do
     test "the min speed is positive and below the max speed" do
       assert BoidFlockingConfig.boid_min_speed() > 0

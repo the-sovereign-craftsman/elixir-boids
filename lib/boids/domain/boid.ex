@@ -11,12 +11,13 @@ defmodule Boids.Boid do
   @behaviour Boids.BoidBehaviour
 
   alias Boids.BoidFlockingConfig
+  alias Boids.BoidFlockingRules
 
   @world_arena Boids.World.world_arena()
-  @separation_radius_squared BoidFlockingConfig.boid_separation_radius() ** 2
   @boid_max_speed BoidFlockingConfig.boid_max_speed()
   @boid_min_speed BoidFlockingConfig.boid_min_speed()
   @boid_separation_weight BoidFlockingConfig.boid_separation_weight()
+  @boid_cohesion_weight BoidFlockingConfig.boid_cohesion_weight()
 
   @type t :: %__MODULE__{
           position: {float(), float()},
@@ -30,7 +31,7 @@ defmodule Boids.Boid do
     %__MODULE__{position: random_position(), velocity: random_velocity()}
   end
 
-  @spec advance_boid(Boids.Boid.t(), [Boids.Boid.t()]) :: Boids.Boid.t()
+  @spec advance_boid(t(), [t()]) :: t()
   def advance_boid(
         %__MODULE__{
           position: {current_x_pos, current_y_pos},
@@ -38,12 +39,13 @@ defmodule Boids.Boid do
         } = boid,
         neighbors
       ) do
-    {separation_x, separation_y} = separation_steering_vector(boid, neighbors)
+    {separation_x, separation_y} = BoidFlockingRules.separation_steering_vector(boid, neighbors)
     separation_x_weighted = separation_x * @boid_separation_weight
     separation_y_weighted = separation_y * @boid_separation_weight
 
-    cohesion_x_weighted = 0
-    cohesion_y_weighted = 0
+    {cohesion_x, cohesion_y} = BoidFlockingRules.cohesion_steering_vector(boid, neighbors)
+    cohesion_x_weighted = cohesion_x * @boid_cohesion_weight
+    cohesion_y_weighted = cohesion_y * @boid_cohesion_weight
 
     alignment_x_weighted = 0
     alignment_y_weighted = 0
@@ -64,25 +66,6 @@ defmodule Boids.Boid do
       clamp_to_arena({new_x_pos, new_y_pos}, {final_x_velocity, final_y_velocity})
 
     %__MODULE__{position: position, velocity: velocity}
-  end
-
-  defp separation_steering_vector(%__MODULE__{position: {x, y}}, neighbors) do
-    neighbors
-    |> Enum.map(fn %__MODULE__{position: {neighbor_x, neighbor_y}} ->
-      away_x = x - neighbor_x
-      away_y = y - neighbor_y
-      distance_squared = away_x * away_x + away_y * away_y
-      {away_x, away_y, distance_squared}
-    end)
-    |> Enum.filter(fn {_away_x, _away_y, distance_squared} ->
-      distance_squared > 0 and distance_squared <= @separation_radius_squared
-    end)
-    |> Enum.map(fn {away_x, away_y, distance_squared} ->
-      {away_x / distance_squared, away_y / distance_squared}
-    end)
-    |> Enum.reduce({0.0, 0.0}, fn {repulsion_x, repulsion_y}, {total_x, total_y} ->
-      {total_x + repulsion_x, total_y + repulsion_y}
-    end)
   end
 
   defp clamp_to_arena({x, y}, {dx, dy}) do
