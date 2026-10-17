@@ -22,14 +22,15 @@ defmodule Boids.BoidFlockingRules do
 
   @default_weights %{
     separation: BoidFlockingConfig.boid_separation_weight(),
-    cohesion: BoidFlockingConfig.boid_cohesion_weight()
+    cohesion: BoidFlockingConfig.boid_cohesion_weight(),
+    alignment: BoidFlockingConfig.boid_alignment_weight()
   }
 
   @typedoc "Which way, and how strongly, a rule wants to push a boid: `{x, y}`."
   @type steering_vector :: {float(), float()}
 
   @typedoc "How strongly each rule counts towards the combined steering. 0 turns a rule off."
-  @type weights :: %{separation: number(), cohesion: number()}
+  @type weights :: %{separation: number(), cohesion: number(), alignment: number()}
 
   @doc "The weights from `Boids.BoidFlockingConfig`."
   @spec default_weights() :: weights()
@@ -43,9 +44,12 @@ defmodule Boids.BoidFlockingRules do
   def combined_steering_vector(boid, neighbors, weights \\ default_weights()) do
     {separation_x, separation_y} = separation_steering_vector(boid, neighbors)
     {cohesion_x, cohesion_y} = cohesion_steering_vector(boid, neighbors)
+    {alignment_x, alignment_y} = alignment_steering_vector(boid, neighbors)
 
-    {separation_x * weights.separation + cohesion_x * weights.cohesion,
-     separation_y * weights.separation + cohesion_y * weights.cohesion}
+    {separation_x * weights.separation + cohesion_x * weights.cohesion +
+       alignment_x * weights.alignment,
+     separation_y * weights.separation + cohesion_y * weights.cohesion +
+       alignment_y * weights.alignment}
   end
 
   @doc """
@@ -86,8 +90,8 @@ defmodule Boids.BoidFlockingRules do
   @spec cohesion_steering_vector(Boid.t(), [Boid.t()]) :: steering_vector()
   def cohesion_steering_vector(_boid, []), do: {0.0, 0.0}
 
-  def cohesion_steering_vector(%Boid{position: {x, y}}, neighbors) do
-    {sum_x, sum_y} =
+  def cohesion_steering_vector(%Boid{position: {position_x, position_y}}, neighbors) do
+    {sum_position_x, sum_position_y} =
       Enum.reduce(neighbors, {0.0, 0.0}, fn neighbor, {total_x, total_y} ->
         {neighbor_x, neighbor_y} = neighbor.position
         {total_x + neighbor_x, total_y + neighbor_y}
@@ -95,6 +99,30 @@ defmodule Boids.BoidFlockingRules do
 
     neighbor_count = length(neighbors)
 
-    {sum_x / neighbor_count - x, sum_y / neighbor_count - y}
+    {sum_position_x / neighbor_count - position_x, sum_position_y / neighbor_count - position_y}
+  end
+
+  @doc """
+  Steers the boid toward the average velocity of its neighbors, so it matches
+  their heading and speed.
+
+  The vector is the difference between that average and the boid's own
+  velocity: the change needed to match the group. It shrinks to nothing once
+  the boid is flying like its neighbors. With no neighbors there is nothing to
+  match, so there is no steering.
+  """
+  @spec alignment_steering_vector(Boid.t(), [Boid.t()]) :: steering_vector()
+  def alignment_steering_vector(_boid, []), do: {0.0, 0.0}
+
+  def alignment_steering_vector(%Boid{velocity: {velocity_x, velocity_y}}, neighbors) do
+    {sum_velocity_x, sum_velocity_y} =
+      Enum.reduce(neighbors, {0.0, 0.0}, fn neighbor, {total_x, total_y} ->
+        {neighbor_x, neighbor_y} = neighbor.velocity
+        {total_x + neighbor_x, total_y + neighbor_y}
+      end)
+
+    neighbor_count = length(neighbors)
+
+    {sum_velocity_x / neighbor_count - velocity_x, sum_velocity_y / neighbor_count - velocity_y}
   end
 end

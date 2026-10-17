@@ -7,15 +7,17 @@ defmodule Boids.BoidFlockingRulesTest do
 
   @separation_radius BoidFlockingConfig.boid_separation_radius()
 
-  # Every test steers this boid. It sits in the middle of the arena; its velocity is
-  # irrelevant to these rules, which only look at positions.
+  # Every test steers this boid: in the middle of the arena, flying straight up at speed 3.
+  # Unless a test says otherwise, neighbors fly the same way (see neighbor_at/2), so
+  # alignment adds nothing and only the rule under test steers.
   @boid %Boid{position: {500.0, 500.0}, velocity: {0.0, -3.0}}
 
   describe "default_weights/0" do
     test "has a weight for every rule, taken from the flocking config" do
       assert BoidFlockingRules.default_weights() == %{
                separation: BoidFlockingConfig.boid_separation_weight(),
-               cohesion: BoidFlockingConfig.boid_cohesion_weight()
+               cohesion: BoidFlockingConfig.boid_cohesion_weight(),
+               alignment: BoidFlockingConfig.boid_alignment_weight()
              }
     end
   end
@@ -26,22 +28,25 @@ defmodule Boids.BoidFlockingRulesTest do
     end
 
     test "multiplies each rule's vector by its weight and sums them" do
-      neighbors = [neighbor_at({490.0, 500.0})]
-      weights = %{separation: 3, cohesion: 0.5}
+      # Close enough to separate, and flying differently, so all three rules steer.
+      neighbors = [neighbor_at({490.0, 500.0}, {3.0, 0.0})]
+      weights = %{separation: 3, cohesion: 0.5, alignment: 0.25}
 
       {separation_x, separation_y} =
         BoidFlockingRules.separation_steering_vector(@boid, neighbors)
 
       {cohesion_x, cohesion_y} = BoidFlockingRules.cohesion_steering_vector(@boid, neighbors)
+      {alignment_x, alignment_y} = BoidFlockingRules.alignment_steering_vector(@boid, neighbors)
 
       assert_vector_in_delta(
         BoidFlockingRules.combined_steering_vector(@boid, neighbors, weights),
-        {separation_x * 3 + cohesion_x * 0.5, separation_y * 3 + cohesion_y * 0.5}
+        {separation_x * 3 + cohesion_x * 0.5 + alignment_x * 0.25,
+         separation_y * 3 + cohesion_y * 0.5 + alignment_y * 0.25}
       )
     end
 
     test "uses the default weights when none are given" do
-      neighbors = [neighbor_at({490.0, 500.0}), neighbor_at({530.0, 520.0})]
+      neighbors = [neighbor_at({490.0, 500.0}, {3.0, 0.0}), neighbor_at({530.0, 520.0})]
 
       assert BoidFlockingRules.combined_steering_vector(@boid, neighbors) ==
                BoidFlockingRules.combined_steering_vector(
@@ -52,13 +57,28 @@ defmodule Boids.BoidFlockingRulesTest do
     end
 
     test "a weight of 0 turns a rule off" do
-      neighbors = [neighbor_at({490.0, 500.0})]
+      neighbors = [neighbor_at({490.0, 500.0}, {3.0, 0.0})]
 
       separation_only =
-        BoidFlockingRules.combined_steering_vector(@boid, neighbors, %{separation: 1, cohesion: 0})
+        BoidFlockingRules.combined_steering_vector(@boid, neighbors, %{
+          separation: 1,
+          cohesion: 0,
+          alignment: 0
+        })
 
       cohesion_only =
-        BoidFlockingRules.combined_steering_vector(@boid, neighbors, %{separation: 0, cohesion: 1})
+        BoidFlockingRules.combined_steering_vector(@boid, neighbors, %{
+          separation: 0,
+          cohesion: 1,
+          alignment: 0
+        })
+
+      alignment_only =
+        BoidFlockingRules.combined_steering_vector(@boid, neighbors, %{
+          separation: 0,
+          cohesion: 0,
+          alignment: 1
+        })
 
       assert_vector_in_delta(
         separation_only,
@@ -69,19 +89,29 @@ defmodule Boids.BoidFlockingRulesTest do
         cohesion_only,
         BoidFlockingRules.cohesion_steering_vector(@boid, neighbors)
       )
+
+      assert_vector_in_delta(
+        alignment_only,
+        BoidFlockingRules.alignment_steering_vector(@boid, neighbors)
+      )
     end
 
     test "with every weight at 0, there is no steering" do
-      neighbors = [neighbor_at({490.0, 500.0}), neighbor_at({530.0, 520.0})]
+      neighbors = [neighbor_at({490.0, 500.0}, {3.0, 0.0}), neighbor_at({530.0, 520.0})]
 
       assert_vector_in_delta(
-        BoidFlockingRules.combined_steering_vector(@boid, neighbors, %{separation: 0, cohesion: 0}),
+        BoidFlockingRules.combined_steering_vector(@boid, neighbors, %{
+          separation: 0,
+          cohesion: 0,
+          alignment: 0
+        }),
         {0.0, 0.0}
       )
     end
 
-    # The next two describe the balance the default weights are tuned for. If a tuning
-    # change flips either one, boids will either pile onto each other or never gather.
+    # The next three describe the balance the default weights are tuned for. If a tuning
+    # change flips one, boids will pile onto each other, never gather, or never turn
+    # together.
     test "with the default weights, separation beats cohesion for a close neighbor" do
       {steering_x, _steering_y} =
         BoidFlockingRules.combined_steering_vector(@boid, [neighbor_at({490.0, 500.0})])
@@ -94,6 +124,19 @@ defmodule Boids.BoidFlockingRulesTest do
         BoidFlockingRules.combined_steering_vector(@boid, [neighbor_at({470.0, 500.0})])
 
       assert steering_x < 0
+    end
+
+    test "with the default weights, alignment turns the boid toward its neighbors' heading" do
+      # Mirrored on either side beyond the separation radius, so separation and cohesion
+      # cancel out, and both flying right.
+      neighbors = [
+        neighbor_at({470.0, 500.0}, {3.0, 0.0}),
+        neighbor_at({530.0, 500.0}, {3.0, 0.0})
+      ]
+
+      {steering_x, _steering_y} = BoidFlockingRules.combined_steering_vector(@boid, neighbors)
+
+      assert steering_x > 0
     end
   end
 
@@ -303,7 +346,105 @@ defmodule Boids.BoidFlockingRulesTest do
     end
   end
 
-  defp neighbor_at(position), do: %Boid{position: position, velocity: {2.0, 0.0}}
+  describe "alignment_steering_vector/2" do
+    test "with no neighbors, there is no steering" do
+      assert BoidFlockingRules.alignment_steering_vector(@boid, []) == {0.0, 0.0}
+    end
+
+    test "with neighbors already flying the same way, there is no steering" do
+      neighbors = [neighbor_at({490.0, 500.0}), neighbor_at({530.0, 520.0})]
+
+      assert_vector_in_delta(
+        BoidFlockingRules.alignment_steering_vector(@boid, neighbors),
+        {0.0, 0.0}
+      )
+    end
+
+    test "steers by the difference between the neighbor's velocity and the boid's" do
+      # The boid flies up at {0, -3}; the neighbor flies right at {3, 0}.
+      # {3, 0} - {0, -3} = {3, 3}: cancel the upward motion, add rightward motion.
+      neighbors = [neighbor_at({530.0, 500.0}, {3.0, 0.0})]
+
+      assert_vector_in_delta(
+        BoidFlockingRules.alignment_steering_vector(@boid, neighbors),
+        {3.0, 3.0}
+      )
+    end
+
+    test "steers toward the average velocity of several neighbors" do
+      # The average of {2, 0} and {0, -2} is {1, -1}; {1, -1} - {0, -3} = {1, 2}.
+      neighbors = [
+        neighbor_at({530.0, 500.0}, {2.0, 0.0}),
+        neighbor_at({470.0, 500.0}, {0.0, -2.0})
+      ]
+
+      assert_vector_in_delta(
+        BoidFlockingRules.alignment_steering_vector(@boid, neighbors),
+        {1.0, 2.0}
+      )
+    end
+
+    test "neighbors whose average matches the boid cause no steering, even if each differs" do
+      # The average of {3, -3} and {-3, -3} is {0, -3}, the boid's own velocity.
+      neighbors = [
+        neighbor_at({530.0, 500.0}, {3.0, -3.0}),
+        neighbor_at({470.0, 500.0}, {-3.0, -3.0})
+      ]
+
+      assert_vector_in_delta(
+        BoidFlockingRules.alignment_steering_vector(@boid, neighbors),
+        {0.0, 0.0}
+      )
+    end
+
+    test "steers hardest against neighbors flying the opposite way" do
+      # {0, 3} - {0, -3} = {0, 6}.
+      neighbors = [neighbor_at({530.0, 500.0}, {0.0, 3.0})]
+
+      assert_vector_in_delta(
+        BoidFlockingRules.alignment_steering_vector(@boid, neighbors),
+        {0.0, 6.0}
+      )
+    end
+
+    test "matches the neighbors' speed, not just their direction" do
+      # Same direction but faster: {0, -4} - {0, -3} = {0, -1}, so the boid speeds up.
+      neighbors = [neighbor_at({530.0, 500.0}, {0.0, -4.0})]
+
+      assert_vector_in_delta(
+        BoidFlockingRules.alignment_steering_vector(@boid, neighbors),
+        {0.0, -1.0}
+      )
+    end
+
+    test "the steering depends on the average velocity, not on how many neighbors there are" do
+      one_neighbor = [neighbor_at({530.0, 500.0}, {3.0, 0.0})]
+
+      three_neighbors_flying_the_same_way = [
+        neighbor_at({530.0, 500.0}, {3.0, 0.0}),
+        neighbor_at({470.0, 500.0}, {3.0, 0.0}),
+        neighbor_at({500.0, 530.0}, {3.0, 0.0})
+      ]
+
+      assert_vector_in_delta(
+        BoidFlockingRules.alignment_steering_vector(@boid, three_neighbors_flying_the_same_way),
+        BoidFlockingRules.alignment_steering_vector(@boid, one_neighbor)
+      )
+    end
+
+    test "ignores the neighbors' positions" do
+      near_neighbor = neighbor_at({505.0, 500.0}, {3.0, 0.0})
+      far_neighbor = neighbor_at({540.0, 520.0}, {3.0, 0.0})
+
+      assert BoidFlockingRules.alignment_steering_vector(@boid, [near_neighbor]) ==
+               BoidFlockingRules.alignment_steering_vector(@boid, [far_neighbor])
+    end
+  end
+
+  # Defaults to flying the same way as @boid, so alignment adds nothing unless a test
+  # gives the neighbor a different velocity.
+  defp neighbor_at(position, velocity \\ {0.0, -3.0}),
+    do: %Boid{position: position, velocity: velocity}
 
   defp assert_vector_in_delta({actual_x, actual_y}, {expected_x, expected_y}) do
     assert_in_delta actual_x, expected_x, 0.0001

@@ -8,7 +8,7 @@ defmodule Boids.BoidFlockingConfig do
   @separation_radius 20
   @separation_weight 10
   @cohesion_weight 0.01
-  @alignment_weight 1
+  @alignment_weight 0.05
   @boid_min_speed 2
   @boid_max_speed 4
 
@@ -27,7 +27,7 @@ defmodule Boids.BoidFlockingConfig do
   @spec boid_cohesion_weight() :: float()
   def boid_cohesion_weight, do: @cohesion_weight
 
-  @spec boid_alignment_weight() :: pos_integer()
+  @spec boid_alignment_weight() :: float()
   def boid_alignment_weight, do: @alignment_weight
 
   @spec boid_min_speed() :: pos_integer()
