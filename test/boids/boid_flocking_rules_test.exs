@@ -11,6 +11,92 @@ defmodule Boids.BoidFlockingRulesTest do
   # irrelevant to these rules, which only look at positions.
   @boid %Boid{position: {500.0, 500.0}, velocity: {0.0, -3.0}}
 
+  describe "default_weights/0" do
+    test "has a weight for every rule, taken from the flocking config" do
+      assert BoidFlockingRules.default_weights() == %{
+               separation: BoidFlockingConfig.boid_separation_weight(),
+               cohesion: BoidFlockingConfig.boid_cohesion_weight()
+             }
+    end
+  end
+
+  describe "combined_steering_vector/3" do
+    test "with no neighbors, there is no steering" do
+      assert BoidFlockingRules.combined_steering_vector(@boid, []) == {0.0, 0.0}
+    end
+
+    test "multiplies each rule's vector by its weight and sums them" do
+      neighbors = [neighbor_at({490.0, 500.0})]
+      weights = %{separation: 3, cohesion: 0.5}
+
+      {separation_x, separation_y} =
+        BoidFlockingRules.separation_steering_vector(@boid, neighbors)
+
+      {cohesion_x, cohesion_y} = BoidFlockingRules.cohesion_steering_vector(@boid, neighbors)
+
+      assert_vector_in_delta(
+        BoidFlockingRules.combined_steering_vector(@boid, neighbors, weights),
+        {separation_x * 3 + cohesion_x * 0.5, separation_y * 3 + cohesion_y * 0.5}
+      )
+    end
+
+    test "uses the default weights when none are given" do
+      neighbors = [neighbor_at({490.0, 500.0}), neighbor_at({530.0, 520.0})]
+
+      assert BoidFlockingRules.combined_steering_vector(@boid, neighbors) ==
+               BoidFlockingRules.combined_steering_vector(
+                 @boid,
+                 neighbors,
+                 BoidFlockingRules.default_weights()
+               )
+    end
+
+    test "a weight of 0 turns a rule off" do
+      neighbors = [neighbor_at({490.0, 500.0})]
+
+      separation_only =
+        BoidFlockingRules.combined_steering_vector(@boid, neighbors, %{separation: 1, cohesion: 0})
+
+      cohesion_only =
+        BoidFlockingRules.combined_steering_vector(@boid, neighbors, %{separation: 0, cohesion: 1})
+
+      assert_vector_in_delta(
+        separation_only,
+        BoidFlockingRules.separation_steering_vector(@boid, neighbors)
+      )
+
+      assert_vector_in_delta(
+        cohesion_only,
+        BoidFlockingRules.cohesion_steering_vector(@boid, neighbors)
+      )
+    end
+
+    test "with every weight at 0, there is no steering" do
+      neighbors = [neighbor_at({490.0, 500.0}), neighbor_at({530.0, 520.0})]
+
+      assert_vector_in_delta(
+        BoidFlockingRules.combined_steering_vector(@boid, neighbors, %{separation: 0, cohesion: 0}),
+        {0.0, 0.0}
+      )
+    end
+
+    # The next two describe the balance the default weights are tuned for. If a tuning
+    # change flips either one, boids will either pile onto each other or never gather.
+    test "with the default weights, separation beats cohesion for a close neighbor" do
+      {steering_x, _steering_y} =
+        BoidFlockingRules.combined_steering_vector(@boid, [neighbor_at({490.0, 500.0})])
+
+      assert steering_x > 0
+    end
+
+    test "with the default weights, only cohesion acts beyond the separation radius" do
+      {steering_x, _steering_y} =
+        BoidFlockingRules.combined_steering_vector(@boid, [neighbor_at({470.0, 500.0})])
+
+      assert steering_x < 0
+    end
+  end
+
   describe "separation_steering_vector/2" do
     test "with no neighbors, there is no push" do
       assert BoidFlockingRules.separation_steering_vector(@boid, []) == {0.0, 0.0}

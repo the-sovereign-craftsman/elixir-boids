@@ -7,8 +7,6 @@ defmodule Boids.BoidTest do
 
   @max_speed BoidFlockingConfig.boid_max_speed()
   @min_speed BoidFlockingConfig.boid_min_speed()
-  @separation_weight BoidFlockingConfig.boid_separation_weight()
-  @cohesion_weight BoidFlockingConfig.boid_cohesion_weight()
 
   describe "new/0" do
     test "returns a boid with position inside the world bounds and velocity at the expected speed" do
@@ -109,38 +107,29 @@ defmodule Boids.BoidTest do
     end
   end
 
-  # advance_boid/2 combines the rules from Boids.BoidFlockingRules, which are tested on
-  # their own in boid_flocking_rules_test.exs. These tests only check the combining:
-  # each rule's vector is multiplied by its weight and added to the velocity, then the
-  # speed is limited. Expected values are built from the rules and the config, so tuning
-  # a weight doesn't break them.
-  describe "advance_boid/2 combining the flocking rules" do
+  # Which way to steer is decided by Boids.BoidFlockingRules.combined_steering_vector/3,
+  # tested in boid_flocking_rules_test.exs. These tests only check that advance_boid/2
+  # applies that steering: adds it to the velocity, limits the speed, then moves.
+  describe "advance_boid/2 applying the steering" do
     @boid_moving_up %Boid{position: {500.0, 500.0}, velocity: {0.0, -3.0}}
 
-    test "with no neighbors, the rules add nothing and the boid keeps its velocity" do
+    test "with no neighbors, there is no steering and the boid keeps its velocity" do
       assert Boid.advance_boid(@boid_moving_up, []) == %Boid{
                position: {500.0, 497.0},
                velocity: {0.0, -3.0}
              }
     end
 
-    test "adds each rule's steering, multiplied by its weight, to the velocity" do
-      # 10 to the left: inside the separation radius, so both rules act on it.
+    test "adds the combined steering vector to the velocity" do
       neighbors = [neighbor_at({490.0, 500.0})]
 
-      {separation_x, separation_y} =
-        BoidFlockingRules.separation_steering_vector(@boid_moving_up, neighbors)
-
-      {cohesion_x, cohesion_y} =
-        BoidFlockingRules.cohesion_steering_vector(@boid_moving_up, neighbors)
-
-      expected_dx = 0.0 + separation_x * @separation_weight + cohesion_x * @cohesion_weight
-      expected_dy = -3.0 + separation_y * @separation_weight + cohesion_y * @cohesion_weight
+      {steering_x, steering_y} =
+        BoidFlockingRules.combined_steering_vector(@boid_moving_up, neighbors)
 
       %Boid{velocity: {dx, dy}} = Boid.advance_boid(@boid_moving_up, neighbors)
 
-      assert_in_delta dx, expected_dx, 0.0001
-      assert_in_delta dy, expected_dy, 0.0001
+      assert_in_delta dx, 0.0 + steering_x, 0.0001
+      assert_in_delta dy, -3.0 + steering_y, 0.0001
     end
 
     test "moves by the new, steered velocity in the same tick" do
@@ -153,21 +142,7 @@ defmodule Boids.BoidTest do
       assert_in_delta y, 500.0 + dy, 0.0001
     end
 
-    test "separation outweighs cohesion for a close neighbor, so the boid moves away" do
-      %Boid{velocity: {dx, _dy}} =
-        Boid.advance_boid(@boid_moving_up, [neighbor_at({490.0, 500.0})])
-
-      assert dx > 0
-    end
-
-    test "only cohesion acts on a neighbor beyond the separation radius, so the boid moves toward it" do
-      %Boid{velocity: {dx, _dy}} =
-        Boid.advance_boid(@boid_moving_up, [neighbor_at({470.0, 500.0})])
-
-      assert dx < 0
-    end
-
-    test "a very strong push is still capped at the max speed" do
+    test "a very strong steer is still capped at the max speed" do
       # Distance 1: a separation push far larger than the max speed.
       %Boid{velocity: velocity} =
         Boid.advance_boid(@boid_moving_up, [neighbor_at({499.0, 500.0})])

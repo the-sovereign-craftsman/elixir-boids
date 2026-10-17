@@ -1,13 +1,18 @@
 defmodule Boids.BoidFlockingRules do
   @moduledoc """
-  The flocking rules, each a pure function from a boid and its neighbors to a
-  steering vector.
+  Decides which way a boid should steer, given its neighbors.
 
-  Every rule looks at the same boid and the same neighbors independently; no
-  rule uses another's result. The vectors returned here are unweighted:
-  `Boids.Boid.advance_boid/2` multiplies each by its weight from
-  `Boids.BoidFlockingConfig`, adds them to the boid's velocity, and limits the
-  speed.
+  `combined_steering_vector/3` is the entry point: it runs every rule, weights
+  each one, and sums them into a single steering vector. `Boids.Boid` adds that
+  vector to the boid's velocity and handles the movement; it doesn't know which
+  rules exist or how they are weighted.
+
+  Each rule is also public and returns an unweighted vector, so its geometry can
+  be tested on its own. Every rule looks at the same boid and the same neighbors
+  independently; no rule uses another's result.
+
+  Weights default to `Boids.BoidFlockingConfig`, but can be passed in, so they
+  can change at runtime. A weight of 0 turns a rule off.
   """
 
   alias Boids.Boid
@@ -15,8 +20,33 @@ defmodule Boids.BoidFlockingRules do
 
   @separation_radius_squared BoidFlockingConfig.boid_separation_radius() ** 2
 
+  @default_weights %{
+    separation: BoidFlockingConfig.boid_separation_weight(),
+    cohesion: BoidFlockingConfig.boid_cohesion_weight()
+  }
+
   @typedoc "Which way, and how strongly, a rule wants to push a boid: `{x, y}`."
   @type steering_vector :: {float(), float()}
+
+  @typedoc "How strongly each rule counts towards the combined steering. 0 turns a rule off."
+  @type weights :: %{separation: number(), cohesion: number()}
+
+  @doc "The weights from `Boids.BoidFlockingConfig`."
+  @spec default_weights() :: weights()
+  def default_weights, do: @default_weights
+
+  @doc """
+  Runs every rule, multiplies each rule's vector by its weight, and sums them
+  into the single steering vector for this tick.
+  """
+  @spec combined_steering_vector(Boid.t(), [Boid.t()], weights()) :: steering_vector()
+  def combined_steering_vector(boid, neighbors, weights \\ default_weights()) do
+    {separation_x, separation_y} = separation_steering_vector(boid, neighbors)
+    {cohesion_x, cohesion_y} = cohesion_steering_vector(boid, neighbors)
+
+    {separation_x * weights.separation + cohesion_x * weights.cohesion,
+     separation_y * weights.separation + cohesion_y * weights.cohesion}
+  end
 
   @doc """
   Pushes the boid away from neighbors inside the separation radius.

@@ -16,8 +16,6 @@ defmodule Boids.Boid do
   @world_arena Boids.World.world_arena()
   @boid_max_speed BoidFlockingConfig.boid_max_speed()
   @boid_min_speed BoidFlockingConfig.boid_min_speed()
-  @boid_separation_weight BoidFlockingConfig.boid_separation_weight()
-  @boid_cohesion_weight BoidFlockingConfig.boid_cohesion_weight()
 
   @type t :: %__MODULE__{
           position: {float(), float()},
@@ -39,22 +37,10 @@ defmodule Boids.Boid do
         } = boid,
         neighbors
       ) do
-    {separation_x, separation_y} = BoidFlockingRules.separation_steering_vector(boid, neighbors)
-    separation_x_weighted = separation_x * @boid_separation_weight
-    separation_y_weighted = separation_y * @boid_separation_weight
+    {steering_x, steering_y} = BoidFlockingRules.combined_steering_vector(boid, neighbors)
 
-    {cohesion_x, cohesion_y} = BoidFlockingRules.cohesion_steering_vector(boid, neighbors)
-    cohesion_x_weighted = cohesion_x * @boid_cohesion_weight
-    cohesion_y_weighted = cohesion_y * @boid_cohesion_weight
-
-    alignment_x_weighted = 0
-    alignment_y_weighted = 0
-
-    steered_x_velocity = separation_x_weighted + cohesion_x_weighted + alignment_x_weighted
-    steered_y_velocity = separation_y_weighted + cohesion_y_weighted + alignment_y_weighted
-
-    composite_x_velocity = steered_x_velocity + current_x_velocity
-    composite_y_velocity = steered_y_velocity + current_y_velocity
+    composite_x_velocity = current_x_velocity + steering_x
+    composite_y_velocity = current_y_velocity + steering_y
 
     {final_x_velocity, final_y_velocity} =
       limit_speed({composite_x_velocity, composite_y_velocity})
