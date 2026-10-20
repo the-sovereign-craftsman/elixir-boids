@@ -86,6 +86,48 @@ defmodule BoidsWeb.BoidsSimulationLiveFailureControlsTest do
     end
   end
 
+  describe "CPU hog controls" do
+    setup do
+      on_exit(&Boids.stop_cpu_hogs/0)
+      :ok
+    end
+
+    test "shows how many hogs are running, starting at 0", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      assert has_element?(view, "#cpu-hog-count", "0")
+    end
+
+    test "+ Hog starts one hog", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view |> element("#start-cpu-hog-button") |> render_click()
+
+      assert Boids.cpu_hog_count() == 1
+      assert has_element?(view, "#cpu-hog-count", "1")
+    end
+
+    test "One per core starts a hog for every scheduler", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+      scheduler_count = :erlang.system_info(:schedulers_online)
+
+      view |> element("#start-cpu-hog-per-core-button") |> render_click()
+
+      assert Boids.cpu_hog_count() == scheduler_count
+      assert has_element?(view, "#cpu-hog-count", "#{scheduler_count}")
+    end
+
+    test "Stop all stops every hog", %{conn: conn} do
+      Boids.start_cpu_hogs(2)
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view |> element("#stop-cpu-hogs-button") |> render_click()
+
+      assert Boids.cpu_hog_count() == 0
+      assert has_element?(view, "#cpu-hog-count", "0")
+    end
+  end
+
   defp crash_boids(view, count) do
     view
     |> form("#crash-boids-form", crash_boids: %{count: count})

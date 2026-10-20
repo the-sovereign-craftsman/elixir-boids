@@ -22,6 +22,8 @@ defmodule Boids.Application do
       # flock. The failure demos kill hundreds, so the limit is raised far past that.
       {DynamicSupervisor,
        name: Boids.DynamicSupervisor, strategy: :one_for_one, max_restarts: 10_000, max_seconds: 1},
+      # Holds the CPU hogs for the fair-scheduling demo, kept apart from the boids.
+      {DynamicSupervisor, name: Boids.CpuHogSupervisor, strategy: :one_for_one},
       # After the boid supervisor, because each sample counts its children. No boid
       # starts at boot, so the tick counter still exists before any boid ticks.
       Boids.SimulationMetrics,

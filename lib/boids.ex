@@ -59,7 +59,7 @@ defmodule Boids do
   @doc "Stops `count` boids. Each one deletes its own row as it stops."
   @spec remove_boids(non_neg_integer()) :: :ok
   def remove_boids(count) when is_integer(count) and count >= 0 do
-    running_boid_pids()
+    boid_pids()
     |> Enum.take(count)
     |> Enum.each(&DynamicSupervisor.terminate_child(Boids.DynamicSupervisor, &1))
   end
@@ -77,20 +77,19 @@ defmodule Boids do
   """
   @spec kill_boids(non_neg_integer()) :: non_neg_integer()
   def kill_boids(count) when is_integer(count) and count >= 0 do
-    boid_pids_to_kill = Enum.take_random(running_boid_pids(), count)
+    boid_pids_to_kill = Enum.take_random(boid_pids(), count)
 
     Enum.each(boid_pids_to_kill, &Process.exit(&1, :kill))
 
     length(boid_pids_to_kill)
   end
 
-  # A child the supervisor is in the middle of restarting is listed with :restarting
-  # where its pid would be. There's no process to stop or kill yet, so it's skipped.
-  defp running_boid_pids do
-    for {_id, pid, _type, _modules} <- DynamicSupervisor.which_children(Boids.DynamicSupervisor),
-        is_pid(pid),
-        do: pid
-  end
+  @doc """
+  The pids of the boids that are running right now. A boid its supervisor is in the
+  middle of restarting has no process yet, so it isn't included.
+  """
+  @spec boid_pids() :: [pid()]
+  def boid_pids, do: running_child_pids(Boids.DynamicSupervisor)
 
   @doc """
   Corrupts the state of `count` random boids, so each one crashes on its next tick:
@@ -103,7 +102,7 @@ defmodule Boids do
   """
   @spec crash_boids(non_neg_integer()) :: non_neg_integer()
   def crash_boids(count) when is_integer(count) and count >= 0 do
-    running_boid_pids()
+    boid_pids()
     |> Enum.take_random(count)
     |> Enum.count(&corrupt_boid_state/1)
   end
@@ -117,8 +116,47 @@ defmodule Boids do
     :exit, _boid_already_dead -> false
   end
 
+  @doc "Starts one CPU hog: a process that spins forever. See `Boids.CpuHog`."
+  @spec start_cpu_hog() :: pid()
+  def start_cpu_hog do
+    {:ok, pid} = DynamicSupervisor.start_child(Boids.CpuHogSupervisor, Boids.CpuHog)
+    pid
+  end
+
+  @doc "Starts `count` CPU hogs."
+  @spec start_cpu_hogs(non_neg_integer()) :: [pid()]
+  def start_cpu_hogs(count) when is_integer(count) and count >= 0 do
+    Enum.map(1..count//1, fn _ -> start_cpu_hog() end)
+  end
+
+  @doc "Stops every CPU hog."
+  @spec stop_cpu_hogs() :: :ok
+  def stop_cpu_hogs do
+    Boids.CpuHogSupervisor
+    |> DynamicSupervisor.which_children()
+    |> Enum.each(fn {_id, pid, _type, _modules} ->
+      DynamicSupervisor.terminate_child(Boids.CpuHogSupervisor, pid)
+    end)
+  end
+
+  @doc "The pids of the CPU hogs that are running right now."
+  @spec cpu_hog_pids() :: [pid()]
+  def cpu_hog_pids, do: running_child_pids(Boids.CpuHogSupervisor)
+
+  @doc "How many CPU hogs are running."
+  @spec cpu_hog_count() :: non_neg_integer()
+  def cpu_hog_count, do: DynamicSupervisor.count_children(Boids.CpuHogSupervisor).active
+
   @doc "How many boids have crashed or been killed. See `Boids.BoidJanitor`."
   defdelegate boid_crash_count(), to: BoidJanitor, as: :crash_count
+
+  # A child its supervisor is in the middle of restarting is listed with :restarting
+  # where its pid would be. There's no process to stop, kill or measure yet, so it's skipped.
+  defp running_child_pids(supervisor) do
+    for {_id, pid, _type, _modules} <- DynamicSupervisor.which_children(supervisor),
+        is_pid(pid),
+        do: pid
+  end
 
   @spec list_boid_positions() :: [{pid(), Boids.Boid.t()}]
   def list_boid_positions do

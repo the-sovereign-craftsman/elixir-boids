@@ -30,6 +30,13 @@ defmodule BoidsWeb.SimulationDashboardComponents do
   end
 
   def simulation_dashboard(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :cpu_work_percents,
+        cpu_work_percents(assigns.snapshot.reductions_since_previous_sample)
+      )
+
     ~H"""
     <section id="simulation-dashboard" class="card bg-base-200">
       <div class="card-body gap-4">
@@ -91,6 +98,43 @@ defmodule BoidsWeb.SimulationDashboardComponents do
               <div class="w-full bg-primary" style={"height: #{scheduler_percent}%"}></div>
             </div>
           </div>
+        </div>
+
+        <%!-- Boids are blue here, as on the canvas. Who did the work in the last second, measured in reductions (the BEAM's unit
+             of work). With hogs running, the CPU bars above read 100% either way; this shows
+             the hogs only take the time the boids aren't using. --%>
+        <div>
+          <.metric_row id="cpu-hog-count-metric" label="CPU hogs">
+            {@snapshot.cpu_hog_count}
+          </.metric_row>
+          <p class="mt-1 text-xs text-base-content/70">Work done in the last second, by process</p>
+          <div id="cpu-work-bar" class="mt-2 flex h-3 overflow-hidden rounded-sm bg-base-300">
+            <div
+              id="cpu-work-boids"
+              class="bg-info"
+              style={"width: #{@cpu_work_percents.boids}%"}
+            >
+            </div>
+            <div
+              id="cpu-work-hogs"
+              class="bg-warning"
+              style={"width: #{@cpu_work_percents.cpu_hogs}%"}
+            >
+            </div>
+            <div
+              id="cpu-work-other"
+              class="bg-base-content/30"
+              style={"width: #{@cpu_work_percents.other}%"}
+            >
+            </div>
+          </div>
+          <p id="cpu-work-legend" class="mt-1 flex flex-wrap gap-x-3 text-xs text-base-content/70">
+            <span><span class="text-info">■</span> Boids {round(@cpu_work_percents.boids)}%</span>
+            <span><span class="text-warning">■</span> Hogs {round(@cpu_work_percents.cpu_hogs)}%</span>
+            <span>
+              <span class="text-base-content/30">■</span> Other {round(@cpu_work_percents.other)}%
+            </span>
+          </p>
         </div>
 
         <div>
@@ -201,6 +245,20 @@ defmodule BoidsWeb.SimulationDashboardComponents do
   end
 
   defp metric_history(history, metric), do: Enum.map(history, &Map.fetch!(&1, metric))
+
+  # Each group's share of the work done, as a percent rounded to one decimal place for
+  # the bar widths. All 0.0 when nothing was measured, rather than dividing by zero.
+  defp cpu_work_percents(%{boids: boids, cpu_hogs: cpu_hogs, other: other} = reductions) do
+    case boids + cpu_hogs + other do
+      0 ->
+        %{boids: 0.0, cpu_hogs: 0.0, other: 0.0}
+
+      total_reductions ->
+        Map.new(reductions, fn {group, group_reductions} ->
+          {group, Float.round(group_reductions / total_reductions * 100, 1)}
+        end)
+    end
+  end
 
   # Every restart in the history window: up to the last minute, one sample per second.
   defp restarts_in_history(history) do

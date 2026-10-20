@@ -6,11 +6,7 @@ defmodule Boids.FlockTestHelpers do
   import Boids.AssertEventually
 
   @doc "The pids of the boids that are running right now, skipping any mid-restart."
-  def running_boid_pids do
-    for {_id, pid, _type, _modules} <- DynamicSupervisor.which_children(Boids.DynamicSupervisor),
-        is_pid(pid),
-        do: pid
-  end
+  def running_boid_pids, do: Boids.boid_pids()
 
   @doc """
   Waits until `killed_count` of the boids in `pids_before_kill` are gone and the

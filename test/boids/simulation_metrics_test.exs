@@ -109,6 +109,65 @@ defmodule Boids.SimulationMetricsTest do
     end
   end
 
+  # Reductions are the BEAM's unit of work. Each sample holds every boid's and every
+  # hog's running total, plus the whole VM's; a snapshot is the work done between two
+  # samples, split by who did it.
+  describe "build_snapshot/2 CPU work" do
+    test "splits the work done between boids, hogs and everything else" do
+      [boid_a, boid_b, hog] = fake_pids(3)
+
+      snapshot =
+        SimulationMetrics.build_snapshot(
+          sample(
+            sampled_at_ms: 0,
+            boid_reductions_by_pid: %{boid_a => 100, boid_b => 200},
+            total_reductions: 1000
+          ),
+          sample(
+            sampled_at_ms: 1000,
+            boid_reductions_by_pid: %{boid_a => 300, boid_b => 500},
+            # Started since the previous sample, so all of its work is new.
+            cpu_hog_reductions_by_pid: %{hog => 4000},
+            total_reductions: 6000
+          )
+        )
+
+      assert snapshot.reductions_since_previous_sample == %{
+               boids: 500,
+               cpu_hogs: 4000,
+               other: 500
+             }
+    end
+
+    # Processes that died between samples did work the VM total includes, but no
+    # process reading does, so the totals can disagree slightly. Other never goes negative.
+    test "other work is never negative" do
+      [boid] = fake_pids(1)
+
+      snapshot =
+        SimulationMetrics.build_snapshot(
+          sample(sampled_at_ms: 0, boid_reductions_by_pid: %{boid => 0}, total_reductions: 0),
+          sample(
+            sampled_at_ms: 1000,
+            boid_reductions_by_pid: %{boid => 900},
+            total_reductions: 800
+          )
+        )
+
+      assert snapshot.reductions_since_previous_sample.other == 0
+    end
+
+    test "counts the hogs running at the current sample" do
+      snapshot =
+        SimulationMetrics.build_snapshot(
+          sample(sampled_at_ms: 0),
+          sample(sampled_at_ms: 1000, cpu_hog_reductions_by_pid: Map.new(fake_pids(3), &{&1, 0}))
+        )
+
+      assert snapshot.cpu_hog_count == 3
+    end
+  end
+
   describe "add_snapshot_to_history/2" do
     test "history adds the newest snapshot at the end" do
       assert SimulationMetrics.add_snapshot_to_history([:first], :second) == [:first, :second]
@@ -123,6 +182,9 @@ defmodule Boids.SimulationMetricsTest do
     end
   end
 
+  # Pids that are only used as map keys, so they don't need to be alive.
+  defp fake_pids(count), do: Enum.map(1..count, &:erlang.list_to_pid(~c"<0.#{&1 + 9000}.0>"))
+
   # A raw sample with harmless defaults. Each test overrides only the fields it checks.
   defp sample(overrides) do
     defaults = %{
@@ -133,7 +195,10 @@ defmodule Boids.SimulationMetricsTest do
       total_process_count: 1,
       total_memory_bytes: 0,
       process_memory_bytes: 0,
-      restart_count: 0
+      restart_count: 0,
+      boid_reductions_by_pid: %{},
+      cpu_hog_reductions_by_pid: %{},
+      total_reductions: 0
     }
 
     Map.merge(defaults, Map.new(overrides))

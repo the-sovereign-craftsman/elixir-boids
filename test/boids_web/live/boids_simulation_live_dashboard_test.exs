@@ -49,6 +49,35 @@ defmodule BoidsWeb.BoidsSimulationLiveDashboardTest do
     assert has_element?(view, "#restart-count", "12,500")
   end
 
+  describe "CPU work" do
+    test "splits the work between boids, hogs and other, with the hog count", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      send_snapshot(
+        view,
+        snapshot(
+          cpu_hog_count: 15,
+          reductions_since_previous_sample: %{boids: 150, cpu_hogs: 800, other: 50}
+        )
+      )
+
+      assert has_element?(view, "#cpu-hog-count-metric", "15")
+      assert has_element?(view, "#cpu-work-legend", "Boids 15%")
+      assert has_element?(view, "#cpu-work-legend", "Hogs 80%")
+      assert has_element?(view, "#cpu-work-legend", "Other 5%")
+      assert has_element?(view, "#cpu-work-bar > #cpu-work-hogs[style*='width: 80.0%']")
+    end
+
+    test "shows 0% for everything when no work was done", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      send_snapshot(view, snapshot())
+
+      assert has_element?(view, "#cpu-work-legend", "Boids 0%")
+      assert has_element?(view, "#cpu-work-legend", "Hogs 0%")
+    end
+  end
+
   test "renders one bar per scheduler", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/")
 
@@ -102,7 +131,9 @@ defmodule BoidsWeb.BoidsSimulationLiveDashboardTest do
         scheduler_utilization_percent: 63.0,
         scheduler_utilization_percent_by_scheduler: [60.0, 66.0],
         total_memory_bytes: 182_000_000,
-        memory_per_boid_bytes: 2_800
+        memory_per_boid_bytes: 2_800,
+        cpu_hog_count: 0,
+        reductions_since_previous_sample: %{boids: 0, cpu_hogs: 0, other: 0}
       },
       Map.new(overrides)
     )

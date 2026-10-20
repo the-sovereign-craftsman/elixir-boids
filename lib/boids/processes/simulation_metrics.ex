@@ -35,7 +35,10 @@ defmodule Boids.SimulationMetrics do
           total_process_count: non_neg_integer(),
           total_memory_bytes: non_neg_integer(),
           process_memory_bytes: non_neg_integer(),
-          restart_count: non_neg_integer()
+          restart_count: non_neg_integer(),
+          boid_reductions_by_pid: %{pid() => non_neg_integer()},
+          cpu_hog_reductions_by_pid: %{pid() => non_neg_integer()},
+          total_reductions: non_neg_integer()
         }
 
   @type snapshot :: %{
@@ -47,7 +50,13 @@ defmodule Boids.SimulationMetrics do
           scheduler_utilization_percent: float(),
           scheduler_utilization_percent_by_scheduler: [float()],
           total_memory_bytes: non_neg_integer(),
-          memory_per_boid_bytes: non_neg_integer()
+          memory_per_boid_bytes: non_neg_integer(),
+          cpu_hog_count: non_neg_integer(),
+          reductions_since_previous_sample: %{
+            boids: non_neg_integer(),
+            cpu_hogs: non_neg_integer(),
+            other: non_neg_integer()
+          }
         }
 
   @type state :: %{previous_sample: sample(), history: [snapshot()]}
@@ -140,7 +149,10 @@ defmodule Boids.SimulationMetrics do
       scheduler_utilization_percent_by_scheduler: scheduler_utilization_percent_by_scheduler,
       total_memory_bytes: current_sample.total_memory_bytes,
       memory_per_boid_bytes:
-        div(current_sample.process_memory_bytes, current_sample.total_process_count)
+        div(current_sample.process_memory_bytes, current_sample.total_process_count),
+      cpu_hog_count: map_size(current_sample.cpu_hog_reductions_by_pid),
+      reductions_since_previous_sample:
+        reductions_since_previous_sample(previous_sample, current_sample)
     }
   end
 
@@ -162,12 +174,60 @@ defmodule Boids.SimulationMetrics do
       total_memory_bytes: :erlang.memory(:total),
       process_memory_bytes: :erlang.memory(:processes),
       # Every crash of a boid leads to one restart by its supervisor.
-      restart_count: BoidJanitor.crash_count()
+      restart_count: BoidJanitor.crash_count(),
+      boid_reductions_by_pid: reductions_by_pid(Boids.boid_pids()),
+      cpu_hog_reductions_by_pid: reductions_by_pid(Boids.cpu_hog_pids()),
+      # The VM-wide total. :exact_reductions also counts the work of the processes
+      # running right now, not just what they had done when they were last switched out.
+      total_reductions: elem(:erlang.statistics(:exact_reductions), 0)
     }
   end
 
   # Ticks are counted across all boids, so dividing by the boid count gives
   # how often each boid ticked. With no boids nothing ticked.
+  # Each process's running total of reductions, the BEAM's unit of work. A process that
+  # dies between listing and reading returns nil, and is left out.
+  defp reductions_by_pid(pids) do
+    for pid <- pids, {:reductions, reductions} <- [Process.info(pid, :reductions)], into: %{} do
+      {pid, reductions}
+    end
+  end
+
+  # The work done between the two samples, split by who did it. Other is everything
+  # else the VM did: the LiveView, the metrics, the janitor, and the processes that died
+  # between samples (their work is in the VM total but in no reading).
+  defp reductions_since_previous_sample(previous_sample, current_sample) do
+    boid_reductions =
+      reductions_since(
+        previous_sample.boid_reductions_by_pid,
+        current_sample.boid_reductions_by_pid
+      )
+
+    cpu_hog_reductions =
+      reductions_since(
+        previous_sample.cpu_hog_reductions_by_pid,
+        current_sample.cpu_hog_reductions_by_pid
+      )
+
+    total_reductions = current_sample.total_reductions - previous_sample.total_reductions
+
+    %{
+      boids: boid_reductions,
+      cpu_hogs: cpu_hog_reductions,
+      other: max(total_reductions - boid_reductions - cpu_hog_reductions, 0)
+    }
+  end
+
+  # A process with no previous reading started after the previous sample, so all of its
+  # work is new.
+  defp reductions_since(previous_reductions_by_pid, current_reductions_by_pid) do
+    current_reductions_by_pid
+    |> Enum.map(fn {pid, reductions} ->
+      reductions - Map.get(previous_reductions_by_pid, pid, 0)
+    end)
+    |> Enum.sum()
+  end
+
   # Two samples in the same millisecond, like one sent by hand just as the timer fires,
   # leave no time to divide by. 0.0 rather than a crash.
   defp per_second(_change, elapsed_seconds) when elapsed_seconds == 0, do: 0.0

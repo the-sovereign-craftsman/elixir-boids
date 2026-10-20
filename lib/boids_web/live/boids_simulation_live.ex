@@ -34,6 +34,7 @@ defmodule BoidsWeb.BoidsSimulationLive do
      |> assign_flocking_rule_toggles_form(Boids.flocking_rule_toggles())
      |> assign(:kill_boids_form, to_form(%{"count" => 100}, as: :kill_boids))
      |> assign(:crash_boids_form, to_form(%{"count" => 100}, as: :crash_boids))
+     |> assign(:cpu_hog_count, Boids.cpu_hog_count())
      |> assign(:max_boid_count, Boids.max_boid_count())
      |> assign_boid_count(Boids.boid_count())}
   end
@@ -136,6 +137,36 @@ defmodule BoidsWeb.BoidsSimulationLive do
                 />
                 <.button id="crash-boids-button" class="btn btn-sm btn-warning">Crash</.button>
               </.form>
+
+              <div class="flex flex-col gap-2">
+                <p class="text-xs text-base-content/70">
+                  Start processes that spin forever. The BEAM still gives every boid its turn.
+                </p>
+                <p class="text-sm">CPU hogs: <span id="cpu-hog-count">{@cpu_hog_count}</span></p>
+                <div class="flex flex-wrap gap-2">
+                  <.button
+                    id="start-cpu-hog-button"
+                    class="btn btn-sm btn-warning btn-soft"
+                    phx-click="start_cpu_hog"
+                  >
+                    + Hog
+                  </.button>
+                  <.button
+                    id="start-cpu-hog-per-core-button"
+                    class="btn btn-sm btn-warning btn-soft"
+                    phx-click="start_cpu_hog_per_core"
+                  >
+                    One per core
+                  </.button>
+                  <.button
+                    id="stop-cpu-hogs-button"
+                    class="btn btn-sm btn-soft"
+                    phx-click="stop_cpu_hogs"
+                  >
+                    Stop all
+                  </.button>
+                </div>
+              </div>
             </div>
           </section>
         </div>
@@ -269,6 +300,26 @@ defmodule BoidsWeb.BoidsSimulationLive do
     end
   end
 
+  def handle_event("start_cpu_hog", _params, socket) do
+    Boids.start_cpu_hog()
+
+    {:noreply, assign(socket, :cpu_hog_count, Boids.cpu_hog_count())}
+  end
+
+  # One hog per scheduler. The BEAM runs one scheduler per CPU core, so this keeps every
+  # core busy with hogs, and the boids have to share every core with them.
+  def handle_event("start_cpu_hog_per_core", _params, socket) do
+    Boids.start_cpu_hogs(:erlang.system_info(:schedulers_online))
+
+    {:noreply, assign(socket, :cpu_hog_count, Boids.cpu_hog_count())}
+  end
+
+  def handle_event("stop_cpu_hogs", _params, socket) do
+    Boids.stop_cpu_hogs()
+
+    {:noreply, assign(socket, :cpu_hog_count, Boids.cpu_hog_count())}
+  end
+
   def handle_event("update_all_flocking_rule_toggles", %{"enabled" => enabled}, socket) do
     Boids.update_all_flocking_rule_toggles(enabled == "true")
 
@@ -284,7 +335,9 @@ defmodule BoidsWeb.BoidsSimulationLive do
     {:noreply,
      socket
      |> assign(:simulation_metrics_snapshot, snapshot)
-     |> assign(:simulation_metrics_history, history)}
+     |> assign(:simulation_metrics_history, history)
+     # Hogs can also be started from iex, so the count is refreshed with the metrics.
+     |> assign(:cpu_hog_count, Boids.cpu_hog_count())}
   end
 
   def handle_info(:render_frame, socket) do
