@@ -13,11 +13,11 @@ defmodule BoidsWeb.BoidsSimulationLiveFlockingControlsTest do
   end
 
   describe "layout" do
-    test "puts the controls left of the canvas, with a panel reserved on the right",
+    test "puts the controls left of the canvas column, with the dashboard on the right",
          %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/")
 
-      assert has_element?(view, "#simulation-controls + #boid-canvas + #telemetry-panel")
+      assert has_element?(view, "#simulation-controls + #canvas-column + #telemetry-panel")
     end
   end
 

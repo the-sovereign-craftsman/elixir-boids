@@ -17,10 +17,16 @@ defmodule BoidsWeb.BoidsSimulationLiveFailureControlsTest do
     :ok
   end
 
-  test "the Break things card sits under the flocking rules", %{conn: conn} do
+  test "the Break things card sits under the canvas, with kill, crash and hogs side by side",
+       %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/")
 
-    assert has_element?(view, "#flocking-controls + #failure-controls")
+    assert has_element?(view, "#canvas-column > #boid-canvas + #failure-controls")
+
+    assert has_element?(
+             view,
+             "#failure-controls #kill-boids-controls + #crash-boids-controls + #cpu-hog-controls"
+           )
   end
 
   test "the kill count starts at 100", %{conn: conn} do

@@ -110,75 +110,88 @@ defmodule BoidsWeb.BoidsSimulationLive do
               </div>
             </div>
           </section>
+        </div>
+
+        <%!-- The canvas with the failure controls under it, next to what they break. --%>
+        <div id="canvas-column" class="flex flex-col gap-6">
+          <canvas
+            id="boid-canvas"
+            phx-hook=".BoidCanvas"
+            phx-update="ignore"
+            width="1000"
+            height="1000"
+            class="w-full aspect-square border border-base-300"
+          ></canvas>
 
           <section id="failure-controls" class="card bg-base-200">
             <div class="card-body gap-4">
               <h2 class="card-title">Break things</h2>
-              <p class="text-xs text-base-content/70">
-                Kill random boid processes. Their supervisor replaces each one within
-                milliseconds, so the boid count barely moves. The new boids flash red.
-              </p>
 
-              <.form for={@kill_boids_form} id="kill-boids-form" phx-submit="kill_boids">
-                <.input field={@kill_boids_form[:count]} type="number" label="Boids to kill" min="1" />
-                <.button id="kill-boids-button" class="btn btn-sm btn-error">Kill</.button>
-              </.form>
+              <div class="grid gap-6 lg:grid-cols-3">
+                <div id="kill-boids-controls" class="flex flex-col gap-2">
+                  <p class="text-xs text-base-content/70">
+                    Kill random boid processes. Their supervisor replaces each one within
+                    milliseconds. The new boids flash red.
+                  </p>
+                  <.form for={@kill_boids_form} id="kill-boids-form" phx-submit="kill_boids">
+                    <.input
+                      field={@kill_boids_form[:count]}
+                      type="number"
+                      label="Boids to kill"
+                      min="1"
+                    />
+                    <.button id="kill-boids-button" class="btn btn-sm btn-error">Kill</.button>
+                  </.form>
+                </div>
 
-              <p class="text-xs text-base-content/70">
-                Corrupt boids' state instead, so their own code crashes on the next tick.
-              </p>
+                <div id="crash-boids-controls" class="flex flex-col gap-2">
+                  <p class="text-xs text-base-content/70">
+                    Corrupt boids' state, so their own code crashes on the next tick.
+                  </p>
+                  <.form for={@crash_boids_form} id="crash-boids-form" phx-submit="crash_boids">
+                    <.input
+                      field={@crash_boids_form[:count]}
+                      type="number"
+                      label="Boids to crash"
+                      min="1"
+                    />
+                    <.button id="crash-boids-button" class="btn btn-sm btn-warning">Crash</.button>
+                  </.form>
+                </div>
 
-              <.form for={@crash_boids_form} id="crash-boids-form" phx-submit="crash_boids">
-                <.input
-                  field={@crash_boids_form[:count]}
-                  type="number"
-                  label="Boids to crash"
-                  min="1"
-                />
-                <.button id="crash-boids-button" class="btn btn-sm btn-warning">Crash</.button>
-              </.form>
-
-              <div class="flex flex-col gap-2">
-                <p class="text-xs text-base-content/70">
-                  Start processes that spin forever. The BEAM still gives every boid its turn.
-                </p>
-                <p class="text-sm">CPU hogs: <span id="cpu-hog-count">{@cpu_hog_count}</span></p>
-                <div class="flex flex-wrap gap-2">
-                  <.button
-                    id="start-cpu-hog-button"
-                    class="btn btn-sm btn-warning btn-soft"
-                    phx-click="start_cpu_hog"
-                  >
-                    + Hog
-                  </.button>
-                  <.button
-                    id="start-cpu-hog-per-core-button"
-                    class="btn btn-sm btn-warning btn-soft"
-                    phx-click="start_cpu_hog_per_core"
-                  >
-                    One per core
-                  </.button>
-                  <.button
-                    id="stop-cpu-hogs-button"
-                    class="btn btn-sm btn-soft"
-                    phx-click="stop_cpu_hogs"
-                  >
-                    Stop all
-                  </.button>
+                <div id="cpu-hog-controls" class="flex flex-col gap-2">
+                  <p class="text-xs text-base-content/70">
+                    Start processes that spin forever. The BEAM still gives every boid its turn.
+                  </p>
+                  <p class="text-sm">CPU hogs: <span id="cpu-hog-count">{@cpu_hog_count}</span></p>
+                  <div class="flex flex-wrap gap-2">
+                    <.button
+                      id="start-cpu-hog-button"
+                      class="btn btn-sm btn-warning btn-soft"
+                      phx-click="start_cpu_hog"
+                    >
+                      + Hog
+                    </.button>
+                    <.button
+                      id="start-cpu-hog-per-core-button"
+                      class="btn btn-sm btn-warning btn-soft"
+                      phx-click="start_cpu_hog_per_core"
+                    >
+                      One per core
+                    </.button>
+                    <.button
+                      id="stop-cpu-hogs-button"
+                      class="btn btn-sm btn-soft"
+                      phx-click="stop_cpu_hogs"
+                    >
+                      Stop all
+                    </.button>
+                  </div>
                 </div>
               </div>
             </div>
           </section>
         </div>
-
-        <canvas
-          id="boid-canvas"
-          phx-hook=".BoidCanvas"
-          phx-update="ignore"
-          width="1000"
-          height="1000"
-          class="w-full aspect-square border border-base-300"
-        ></canvas>
 
         <%!-- Under the canvas, across both columns, until xl gives it the right column. --%>
         <aside id="telemetry-panel" class="md:col-span-2 xl:col-span-1">
