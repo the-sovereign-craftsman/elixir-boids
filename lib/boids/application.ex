@@ -16,6 +16,9 @@ defmodule Boids.Application do
       # Before the boids, so the toggles table exists before any boid ticks.
       Boids.BoidFlockingRuleToggles,
       {DynamicSupervisor, name: Boids.DynamicSupervisor, strategy: :one_for_one},
+      # After the boid supervisor, because each sample counts its children. No boid
+      # starts at boot, so the tick counter still exists before any boid ticks.
+      Boids.SimulationMetrics,
       # Start a worker by calling: Boids.Worker.start_link(arg)
       # {Boids.Worker, arg},
       # Start to serve requests, typically the last entry

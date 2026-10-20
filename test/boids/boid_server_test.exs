@@ -9,6 +9,7 @@ defmodule Boids.BoidServerTest do
   alias Boids.BoidPositions
   alias Boids.BoidServer
   alias Boids.BoidSpatialGrid
+  alias Boids.SimulationMetrics
 
   setup :verify_on_exit!
 
@@ -267,6 +268,24 @@ defmodule Boids.BoidServerTest do
 
       assert_receive {:toggles_passed_to_advance_boid, flocking_rule_toggles}
       assert flocking_rule_toggles == BoidFlockingRuleToggles.flocking_rule_toggles()
+    end
+  end
+
+  describe "handle_info/2 tick counting" do
+    # The counter is shared by every boid, and other async tests tick boids too,
+    # so this checks that the count went up rather than by exactly one.
+    test "each tick is counted for the dashboard" do
+      initial_boid = %Boid{position: {500.0, 500.0}, velocity: {0.0, 0.0}}
+      expect(BoidMock, :new, fn -> initial_boid end)
+      expect(BoidMock, :advance_boid, fn boid, _neighbors, _flocking_rule_toggles -> boid end)
+
+      pid = start_supervised!({BoidServer, []})
+      tick_count_before = SimulationMetrics.tick_count()
+
+      send(pid, :tick)
+      :sys.get_state(pid)
+
+      assert SimulationMetrics.tick_count() > tick_count_before
     end
   end
 

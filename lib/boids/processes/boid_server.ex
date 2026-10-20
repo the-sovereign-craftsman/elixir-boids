@@ -24,6 +24,7 @@ defmodule Boids.BoidServer do
   alias Boids.BoidFlockingRuleToggles
   alias Boids.BoidPositions
   alias Boids.BoidSpatialGrid
+  alias Boids.SimulationMetrics
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, :ok)
@@ -66,6 +67,8 @@ defmodule Boids.BoidServer do
     if old_cell != new_cell do
       :ets.delete(BoidPositions.table_name(), {old_cell_x, old_cell_y, self()})
     end
+
+    SimulationMetrics.record_tick()
 
     schedule_tick()
     {:noreply, new_boid}

@@ -8,6 +8,7 @@ defmodule Boids do
   """
   alias Boids.BoidFlockingRuleToggles
   alias Boids.BoidPositions
+  alias Boids.SimulationMetrics
 
   # The most boids set_boid_count/1 will allow. spawn_boids/1 ignores it, so iex can go past it
   # for performance experiments.
@@ -85,4 +86,13 @@ defmodule Boids do
 
   @doc "Turns one flocking rule on or off. See `Boids.BoidFlockingRuleToggles`."
   defdelegate update_flocking_rule_toggles(rule, enabled?), to: BoidFlockingRuleToggles
+
+  @doc """
+  Subscribes the caller to a metrics snapshot every second, sent as
+  `{:simulation_metrics_updated, snapshot, history}`. See `Boids.SimulationMetrics`.
+  """
+  defdelegate subscribe_to_simulation_metrics(), to: SimulationMetrics
+
+  @doc "How many times per second each boid should tick. See `Boids.SimulationMetrics`."
+  defdelegate target_tick_rate_hz(), to: SimulationMetrics
 end
