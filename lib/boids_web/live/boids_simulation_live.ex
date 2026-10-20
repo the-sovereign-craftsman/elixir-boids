@@ -1,6 +1,8 @@
 defmodule BoidsWeb.BoidsSimulationLive do
   use BoidsWeb, :live_view
 
+  import BoidsWeb.SimulationDashboardComponents
+
   alias Boids.Boid
 
   @frame_interval_ms div(1000, 24)
@@ -16,11 +18,16 @@ defmodule BoidsWeb.BoidsSimulationLive do
   def mount(_params, _session, socket) do
     if connected?(socket) do
       Boids.subscribe_to_flocking_rule_toggles()
+      Boids.subscribe_to_simulation_metrics()
       Process.send_after(self(), :render_frame, @frame_interval_ms)
     end
 
     {:ok,
      socket
+     # The dashboard shows a placeholder until the first metrics broadcast, within a second.
+     |> assign(:simulation_metrics_snapshot, nil)
+     |> assign(:simulation_metrics_history, [])
+     |> assign(:target_tick_rate_hz, Boids.target_tick_rate_hz())
      |> assign(:flocking_rule_descriptions, @flocking_rule_descriptions)
      |> assign_flocking_rule_toggles_form(Boids.flocking_rule_toggles())
      |> assign(:max_boid_count, Boids.max_boid_count())
@@ -109,8 +116,14 @@ defmodule BoidsWeb.BoidsSimulationLive do
           class="w-full aspect-square border border-base-300"
         ></canvas>
 
-        <%!-- Reserved for the telemetry dashboard, so the canvas stays centered. --%>
-        <aside id="telemetry-panel" class="hidden xl:block"></aside>
+        <%!-- Under the canvas, across both columns, until xl gives it the right column. --%>
+        <aside id="telemetry-panel" class="md:col-span-2 xl:col-span-1">
+          <.simulation_dashboard
+            snapshot={@simulation_metrics_snapshot}
+            history={@simulation_metrics_history}
+            target_tick_rate_hz={@target_tick_rate_hz}
+          />
+        </aside>
       </div>
 
       <script :type={Phoenix.LiveView.ColocatedHook} name=".BoidCanvas">
@@ -185,6 +198,13 @@ defmodule BoidsWeb.BoidsSimulationLive do
   @impl true
   def handle_info({:flocking_rule_toggles_updated, flocking_rule_toggles}, socket) do
     {:noreply, assign_flocking_rule_toggles_form(socket, flocking_rule_toggles)}
+  end
+
+  def handle_info({:simulation_metrics_updated, snapshot, history}, socket) do
+    {:noreply,
+     socket
+     |> assign(:simulation_metrics_snapshot, snapshot)
+     |> assign(:simulation_metrics_history, history)}
   end
 
   def handle_info(:render_frame, socket) do
