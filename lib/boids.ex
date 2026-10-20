@@ -6,7 +6,7 @@ defmodule Boids do
   Contexts are also responsible for managing your data, regardless
   if it comes from the database, an external API or others.
   """
-  alias Boids.BoidFlockingSettings
+  alias Boids.BoidFlockingRuleToggles
   alias Boids.BoidPositions
 
   @spec spawn_boid() :: pid()
@@ -25,6 +25,6 @@ defmodule Boids do
     :ets.tab2list(BoidPositions.table_name())
   end
 
-  @doc "Turns one flocking rule on or off. See `Boids.BoidFlockingSettings`."
-  defdelegate update_flocking_settings(rule, enabled?), to: BoidFlockingSettings
+  @doc "Turns one flocking rule on or off. See `Boids.BoidFlockingRuleToggles`."
+  defdelegate update_flocking_rule_toggles(rule, enabled?), to: BoidFlockingRuleToggles
 end

@@ -8,8 +8,13 @@ defmodule Boids.BoidBehaviour do
   """
 
   alias Boids.Boid
+  alias Boids.BoidFlockingRuleToggles
 
   @callback new() :: Boid.t()
 
-  @callback advance_boid(Boid.t(), [Boid.t()]) :: Boid.t()
+  @callback advance_boid(
+              Boid.t(),
+              [Boid.t()],
+              BoidFlockingRuleToggles.enabled_flocking_rules()
+            ) :: Boid.t()
 end

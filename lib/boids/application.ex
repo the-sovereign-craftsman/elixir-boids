@@ -13,8 +13,8 @@ defmodule Boids.Application do
       {DNSCluster, query: Application.get_env(:boids, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Boids.PubSub},
       Boids.BoidPositions,
-      # Before the boids, so the settings table exists before any boid ticks.
-      Boids.BoidFlockingSettings,
+      # Before the boids, so the toggles table exists before any boid ticks.
+      Boids.BoidFlockingRuleToggles,
       {DynamicSupervisor, name: Boids.DynamicSupervisor, strategy: :one_for_one},
       # Start a worker by calling: Boids.Worker.start_link(arg)
       # {Boids.Worker, arg},

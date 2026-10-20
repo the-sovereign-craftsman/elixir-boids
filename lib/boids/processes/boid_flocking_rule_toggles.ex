@@ -1,6 +1,6 @@
-defmodule Boids.BoidFlockingSettings do
+defmodule Boids.BoidFlockingRuleToggles do
   @moduledoc """
-  Owns the `:boid_flocking_settings` ETS table, which records which flocking
+  Owns the `:boid_flocking_rule_toggles` ETS table, which records which flocking
   rules are currently turned on.
 
   The table holds a single row, `{:enabled_flocking_rules, %{separation: _,
@@ -9,14 +9,14 @@ defmodule Boids.BoidFlockingSettings do
   one rule from before a change and another from after.
 
   The table is `:protected`: any process can read it, but only this process can
-  write to it. Changes go through `update_flocking_settings/2`, which sends a
+  write to it. Changes go through `update_flocking_rule_toggles/2`, which sends a
   `GenServer.call` so they are applied one at a time. Reads go straight to ETS,
   so boids never wait on this process.
   """
 
   use GenServer
 
-  @table_name :boid_flocking_settings
+  @table_name :boid_flocking_rule_toggles
   @enabled_flocking_rules_key :enabled_flocking_rules
   @flocking_rules [:separation, :cohesion, :alignment]
 
@@ -48,10 +48,21 @@ defmodule Boids.BoidFlockingSettings do
   Only accepts a known rule and a boolean. Anything else raises
   `FunctionClauseError` here, in the caller, before reaching this process.
   """
-  @spec update_flocking_settings(flocking_rule(), boolean()) :: :ok
-  def update_flocking_settings(rule, enabled?)
+  @spec update_flocking_rule_toggles(flocking_rule(), boolean()) :: :ok
+  def update_flocking_rule_toggles(rule, enabled?)
       when rule in @flocking_rules and is_boolean(enabled?) do
     GenServer.call(__MODULE__, {:set_flocking_rule_enabled, rule, enabled?})
+  end
+
+  @doc """
+  Returns the current enabled/disabled state for each flocking rule
+  """
+  @spec flocking_rule_toggles() :: enabled_flocking_rules()
+  def flocking_rule_toggles do
+    [{@enabled_flocking_rules_key, enabled_flocking_rules}] =
+      :ets.lookup(@table_name, @enabled_flocking_rules_key)
+
+    enabled_flocking_rules
   end
 
   @impl true

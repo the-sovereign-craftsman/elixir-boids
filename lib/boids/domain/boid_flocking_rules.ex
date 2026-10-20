@@ -2,21 +2,26 @@ defmodule Boids.BoidFlockingRules do
   @moduledoc """
   Decides which way a boid should steer, given its neighbors.
 
-  `combined_steering_vector/3` is the entry point: it runs every rule, weights
-  each one, and sums them into a single steering vector. `Boids.Boid` adds that
-  vector to the boid's velocity and handles the movement; it doesn't know which
-  rules exist or how they are weighted.
+  `combined_steering_vector/4` is the entry point: it runs every rule that is
+  turned on, weights each one, and sums them into a single steering vector.
+  `Boids.Boid` adds that vector to the boid's velocity and handles the
+  movement; it doesn't know which rules exist or how they are weighted.
 
   Each rule is also public and returns an unweighted vector, so its geometry can
   be tested on its own. Every rule looks at the same boid and the same neighbors
   independently; no rule uses another's result.
 
-  Weights default to `Boids.BoidFlockingConfig`, but can be passed in, so they
-  can change at runtime. A weight of 0 turns a rule off.
+  Which rules are turned on is passed in on every call (see
+  `Boids.BoidFlockingRuleToggles`). A rule that is off is never run, so it
+  costs nothing. Weights default to `Boids.BoidFlockingConfig`, but can be
+  passed in, so they can change at runtime.
   """
 
   alias Boids.Boid
   alias Boids.BoidFlockingConfig
+  alias Boids.BoidFlockingRuleToggles
+
+  @flocking_rules [:separation, :cohesion, :alignment]
 
   @separation_radius_squared BoidFlockingConfig.boid_separation_radius() ** 2
 
@@ -29,7 +34,7 @@ defmodule Boids.BoidFlockingRules do
   @typedoc "Which way, and how strongly, a rule wants to push a boid: `{x, y}`."
   @type steering_vector :: {float(), float()}
 
-  @typedoc "How strongly each rule counts towards the combined steering. 0 turns a rule off."
+  @typedoc "How strongly each rule counts towards the combined steering, when it is turned on."
   @type weights :: %{separation: number(), cohesion: number(), alignment: number()}
 
   @doc "The weights from `Boids.BoidFlockingConfig`."
@@ -37,20 +42,47 @@ defmodule Boids.BoidFlockingRules do
   def default_weights, do: @default_weights
 
   @doc """
-  Runs every rule, multiplies each rule's vector by its weight, and sums them
-  into the single steering vector for this tick.
-  """
-  @spec combined_steering_vector(Boid.t(), [Boid.t()], weights()) :: steering_vector()
-  def combined_steering_vector(boid, neighbors, weights \\ default_weights()) do
-    {separation_x, separation_y} = separation_steering_vector(boid, neighbors)
-    {cohesion_x, cohesion_y} = cohesion_steering_vector(boid, neighbors)
-    {alignment_x, alignment_y} = alignment_steering_vector(boid, neighbors)
+  Runs every rule that is turned on, multiplies each rule's vector by its
+  weight, and sums them into the single steering vector for this tick.
 
-    {separation_x * weights.separation + cohesion_x * weights.cohesion +
-       alignment_x * weights.alignment,
-     separation_y * weights.separation + cohesion_y * weights.cohesion +
-       alignment_y * weights.alignment}
+  A rule that is turned off is skipped before it runs, so it costs nothing.
+  With every rule off, there is no steering.
+  """
+  @spec combined_steering_vector(
+          Boid.t(),
+          [Boid.t()],
+          BoidFlockingRuleToggles.enabled_flocking_rules(),
+          weights()
+        ) :: steering_vector()
+  def combined_steering_vector(
+        boid,
+        neighbors,
+        flocking_rule_toggles,
+        weights \\ default_weights()
+      ) do
+    @flocking_rules
+    |> Enum.filter(fn rule -> Map.fetch!(flocking_rule_toggles, rule) end)
+    |> Enum.map(fn rule ->
+      weighted_steering_vector(rule, Map.fetch!(weights, rule), boid, neighbors)
+    end)
+    |> Enum.reduce({0.0, 0.0}, fn {rule_x, rule_y}, {total_x, total_y} ->
+      {total_x + rule_x, total_y + rule_y}
+    end)
   end
+
+  defp weighted_steering_vector(rule, weight, boid, neighbors) do
+    {rule_x, rule_y} = rule_steering_vector(rule, boid, neighbors)
+    {rule_x * weight, rule_y * weight}
+  end
+
+  defp rule_steering_vector(:separation, boid, neighbors),
+    do: separation_steering_vector(boid, neighbors)
+
+  defp rule_steering_vector(:cohesion, boid, neighbors),
+    do: cohesion_steering_vector(boid, neighbors)
+
+  defp rule_steering_vector(:alignment, boid, neighbors),
+    do: alignment_steering_vector(boid, neighbors)
 
   @doc """
   Pushes the boid away from neighbors inside the separation radius.

@@ -15,6 +15,7 @@ defmodule Boids.BoidServer do
   use GenServer
 
   alias Boids.BoidFlockingConfig
+  alias Boids.BoidFlockingRuleToggles
   alias Boids.BoidPositions
   alias Boids.BoidSpatialGrid
 
@@ -45,7 +46,9 @@ defmodule Boids.BoidServer do
         self()
       )
 
-    new_boid = boid_module().advance_boid(boid, neighbors)
+    flocking_rule_toggles = BoidFlockingRuleToggles.flocking_rule_toggles()
+
+    new_boid = boid_module().advance_boid(boid, neighbors, flocking_rule_toggles)
     {new_cell_x, new_cell_y} = new_cell = BoidSpatialGrid.cell_for_position(new_boid.position)
 
     :ets.insert(BoidPositions.table_name(), {{new_cell_x, new_cell_y, self()}, new_boid})

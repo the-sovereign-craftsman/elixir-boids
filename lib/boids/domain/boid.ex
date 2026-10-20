@@ -4,7 +4,7 @@ defmodule Boids.Boid do
   moves one step.
 
   Contains no processes or state. `Boids.BoidServer` holds a `%Boid{}` and
-  calls `advance_boid/2` on every tick. Boids that reach the edge of the
+  calls `advance_boid/3` on every tick. Boids that reach the edge of the
   `Boids.World` arena are clamped to the wall and bounce back.
   """
 
@@ -12,6 +12,7 @@ defmodule Boids.Boid do
 
   alias Boids.BoidFlockingConfig
   alias Boids.BoidFlockingRules
+  alias Boids.BoidFlockingRuleToggles
 
   @world_arena Boids.World.world_arena()
   @boid_max_speed BoidFlockingConfig.boid_max_speed()
@@ -29,15 +30,17 @@ defmodule Boids.Boid do
     %__MODULE__{position: random_position(), velocity: random_velocity()}
   end
 
-  @spec advance_boid(t(), [t()]) :: t()
+  @spec advance_boid(t(), [t()], BoidFlockingRuleToggles.enabled_flocking_rules()) :: t()
   def advance_boid(
         %__MODULE__{
           position: {current_x_pos, current_y_pos},
           velocity: {current_x_velocity, current_y_velocity}
         } = boid,
-        neighbors
+        neighbors,
+        flocking_rule_toggles
       ) do
-    {steering_x, steering_y} = BoidFlockingRules.combined_steering_vector(boid, neighbors)
+    {steering_x, steering_y} =
+      BoidFlockingRules.combined_steering_vector(boid, neighbors, flocking_rule_toggles)
 
     composite_x_velocity = current_x_velocity + steering_x
     composite_y_velocity = current_y_velocity + steering_y

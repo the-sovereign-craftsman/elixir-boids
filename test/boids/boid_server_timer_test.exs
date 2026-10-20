@@ -30,7 +30,7 @@ defmodule Boids.BoidServerTimerTest do
 
       # A stub rather than an expect: the timer keeps firing until the server is stopped,
       # so the number of calls isn't fixed.
-      stub(BoidMock, :advance_boid, fn boid, _neighbors ->
+      stub(BoidMock, :advance_boid, fn boid, _neighbors, _flocking_rule_toggles ->
         send(test_pid, :advanced_by_timer)
         boid
       end)

@@ -4,6 +4,7 @@ defmodule Boids.BoidServerTest do
   import Mox
 
   alias Boids.Boid
+  alias Boids.BoidFlockingRuleToggles
   alias Boids.BoidMock
   alias Boids.BoidPositions
   alias Boids.BoidServer
@@ -44,7 +45,10 @@ defmodule Boids.BoidServerTest do
       advanced_boid = %Boid{position: {1.0, 1.0}, velocity: {1.0, 1.0}}
 
       expect(BoidMock, :new, fn -> initial_boid end)
-      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors -> advanced_boid end)
+
+      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors, _flocking_rule_toggles ->
+        advanced_boid
+      end)
 
       pid = start_supervised!({BoidServer, []})
       send(pid, :tick)
@@ -57,7 +61,10 @@ defmodule Boids.BoidServerTest do
       advanced_boid = %Boid{position: {1.0, 1.0}, velocity: {1.0, 1.0}}
 
       expect(BoidMock, :new, fn -> initial_boid end)
-      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors -> advanced_boid end)
+
+      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors, _flocking_rule_toggles ->
+        advanced_boid
+      end)
 
       pid = start_supervised!({BoidServer, []})
       send(pid, :tick)
@@ -78,7 +85,10 @@ defmodule Boids.BoidServerTest do
       advanced_boid = %Boid{position: {20.0, 10.0}, velocity: {10.0, 0.0}}
 
       expect(BoidMock, :new, fn -> initial_boid end)
-      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors -> advanced_boid end)
+
+      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors, _flocking_rule_toggles ->
+        advanced_boid
+      end)
 
       pid = start_supervised!({BoidServer, []})
       send(pid, :tick)
@@ -93,7 +103,10 @@ defmodule Boids.BoidServerTest do
       advanced_boid = %Boid{position: {60.0, 10.0}, velocity: {20.0, 0.0}}
 
       expect(BoidMock, :new, fn -> initial_boid end)
-      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors -> advanced_boid end)
+
+      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors, _flocking_rule_toggles ->
+        advanced_boid
+      end)
 
       pid = start_supervised!({BoidServer, []})
       assert rows_for(pid) == [{{0, 0, pid}, initial_boid}]
@@ -113,9 +126,12 @@ defmodule Boids.BoidServerTest do
       boid_3 = %Boid{position: {40.0, 60.0}, velocity: {0.0, 0.0}}
 
       expect(BoidMock, :new, fn -> boid_0 end)
-      expect(BoidMock, :advance_boid, fn ^boid_0, _neighbors -> boid_1 end)
-      expect(BoidMock, :advance_boid, fn ^boid_1, _neighbors -> boid_2 end)
-      expect(BoidMock, :advance_boid, fn ^boid_2, _neighbors -> boid_3 end)
+
+      expect(BoidMock, :advance_boid, fn ^boid_0, _neighbors, _flocking_rule_toggles -> boid_1 end)
+
+      expect(BoidMock, :advance_boid, fn ^boid_1, _neighbors, _flocking_rule_toggles -> boid_2 end)
+
+      expect(BoidMock, :advance_boid, fn ^boid_2, _neighbors, _flocking_rule_toggles -> boid_3 end)
 
       pid = start_supervised!({BoidServer, []})
 
@@ -153,7 +169,7 @@ defmodule Boids.BoidServerTest do
       test_pid = self()
       expect(BoidMock, :new, fn -> initial_boid end)
 
-      expect(BoidMock, :advance_boid, fn ^initial_boid, neighbors ->
+      expect(BoidMock, :advance_boid, fn ^initial_boid, neighbors, _flocking_rule_toggles ->
         send(test_pid, {:neighbors_passed_to_advance_boid, neighbors})
         initial_boid
       end)
@@ -172,7 +188,7 @@ defmodule Boids.BoidServerTest do
       test_pid = self()
       expect(BoidMock, :new, fn -> initial_boid end)
 
-      expect(BoidMock, :advance_boid, fn ^initial_boid, neighbors ->
+      expect(BoidMock, :advance_boid, fn ^initial_boid, neighbors, _flocking_rule_toggles ->
         send(test_pid, {:neighbors_passed_to_advance_boid, neighbors})
         initial_boid
       end)
@@ -181,6 +197,28 @@ defmodule Boids.BoidServerTest do
       send(pid, :tick)
 
       assert_receive {:neighbors_passed_to_advance_boid, []}
+    end
+  end
+
+  describe "handle_info/2 flocking rule toggles" do
+    # Only reads the toggles: changing them here would race with other async tests.
+    # Changing them is covered in boid_flocking_rule_toggles_test.exs.
+    test "passes the current flocking rule toggles to advance_boid" do
+      initial_boid = %Boid{position: {825.0, 975.0}, velocity: {0.0, 0.0}}
+
+      test_pid = self()
+      expect(BoidMock, :new, fn -> initial_boid end)
+
+      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors, flocking_rule_toggles ->
+        send(test_pid, {:toggles_passed_to_advance_boid, flocking_rule_toggles})
+        initial_boid
+      end)
+
+      pid = start_supervised!({BoidServer, []})
+      send(pid, :tick)
+
+      assert_receive {:toggles_passed_to_advance_boid, flocking_rule_toggles}
+      assert flocking_rule_toggles == BoidFlockingRuleToggles.flocking_rule_toggles()
     end
   end
 
