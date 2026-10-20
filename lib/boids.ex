@@ -7,6 +7,7 @@ defmodule Boids do
   if it comes from the database, an external API or others.
   """
   alias Boids.BoidFlockingRuleToggles
+  alias Boids.BoidJanitor
   alias Boids.BoidPositions
   alias Boids.SimulationMetrics
 
@@ -58,17 +59,41 @@ defmodule Boids do
   @doc "Stops `count` boids. Each one deletes its own row as it stops."
   @spec remove_boids(non_neg_integer()) :: :ok
   def remove_boids(count) when is_integer(count) and count >= 0 do
-    Boids.DynamicSupervisor
-    |> DynamicSupervisor.which_children()
+    running_boid_pids()
     |> Enum.take(count)
-    |> Enum.each(fn {_id, pid, _type, _modules} ->
-      DynamicSupervisor.terminate_child(Boids.DynamicSupervisor, pid)
-    end)
+    |> Enum.each(&DynamicSupervisor.terminate_child(Boids.DynamicSupervisor, &1))
   end
 
   @doc "Stops every boid."
   @spec remove_all_boids() :: :ok
   def remove_all_boids, do: remove_boids(boid_count())
+
+  @doc """
+  Kills `count` random boids with `Process.exit(pid, :kill)`, which can't be
+  trapped, so they die without running `terminate/2`. Their supervisor restarts
+  each one as a fresh boid at a random position, and `Boids.BoidJanitor` deletes
+  the dead boids' rows and counts the deaths. Returns how many were killed, which
+  is every boid when `count` is more than there are.
+  """
+  @spec kill_boids(non_neg_integer()) :: non_neg_integer()
+  def kill_boids(count) when is_integer(count) and count >= 0 do
+    boid_pids_to_kill = Enum.take_random(running_boid_pids(), count)
+
+    Enum.each(boid_pids_to_kill, &Process.exit(&1, :kill))
+
+    length(boid_pids_to_kill)
+  end
+
+  # A child the supervisor is in the middle of restarting is listed with :restarting
+  # where its pid would be. There's no process to stop or kill yet, so it's skipped.
+  defp running_boid_pids do
+    for {_id, pid, _type, _modules} <- DynamicSupervisor.which_children(Boids.DynamicSupervisor),
+        is_pid(pid),
+        do: pid
+  end
+
+  @doc "How many boids have crashed or been killed. See `Boids.BoidJanitor`."
+  defdelegate boid_crash_count(), to: BoidJanitor, as: :crash_count
 
   @spec list_boid_positions() :: [{pid(), Boids.Boid.t()}]
   def list_boid_positions do

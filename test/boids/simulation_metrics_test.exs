@@ -66,6 +66,30 @@ defmodule Boids.SimulationMetricsTest do
                :erlang.system_info(:schedulers)
     end
 
+    test "overall CPU is the average of the per-scheduler figures, so it matches the bars" do
+      snapshot =
+        SimulationMetrics.build_snapshot(sample(sampled_at_ms: 0), sample(sampled_at_ms: 1000))
+
+      by_scheduler = snapshot.scheduler_utilization_percent_by_scheduler
+
+      assert_in_delta snapshot.scheduler_utilization_percent,
+                      Enum.sum(by_scheduler) / length(by_scheduler),
+                      0.0001
+    end
+
+    # Two samples can land in the same millisecond, like a sample sent by hand just as
+    # the timer fires. There's no time to divide by, so the rates are reported as 0.0.
+    test "rates are 0.0 when both samples were taken in the same millisecond" do
+      snapshot =
+        SimulationMetrics.build_snapshot(
+          sample(sampled_at_ms: 500, tick_count: 0, restart_count: 0, boid_process_count: 10),
+          sample(sampled_at_ms: 500, tick_count: 30, restart_count: 2, boid_process_count: 10)
+        )
+
+      assert snapshot.tick_rate_hz == 0.0
+      assert snapshot.restarts_per_second == 0.0
+    end
+
     test "counts are taken from the current sample" do
       snapshot =
         SimulationMetrics.build_snapshot(

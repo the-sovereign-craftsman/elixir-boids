@@ -56,10 +56,15 @@ defmodule BoidsWeb.SimulationDashboardComponents do
         </div>
 
         <div>
-          <.metric_row id="restart-count" label="Restarts">
-            {format_integer_with_commas(@snapshot.restart_count)}
+          <%!-- The last second's restarts lead, since they spike when boids are killed and
+               drop back to 0 as the supervisor catches up. The total only ever grows. --%>
+          <.metric_row id="restarts-per-second" label="Restarts / s">
+            {format_integer_with_commas(round(@snapshot.restarts_per_second))}
           </.metric_row>
           <.sparkline id="restarts-sparkline" values={metric_history(@history, :restarts_per_second)} />
+          <.metric_row id="restart-count" label="Total restarts">
+            {format_integer_with_commas(@snapshot.restart_count)}
+          </.metric_row>
         </div>
 
         <div>

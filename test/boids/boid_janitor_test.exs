@@ -3,6 +3,7 @@ defmodule Boids.BoidJanitorTest do
   # compares the count before and after rather than expecting an exact number.
   use ExUnit.Case, async: false
 
+  import Boids.AssertEventually
   import Mox
 
   alias Boids.BoidJanitor
@@ -126,20 +127,5 @@ defmodule Boids.BoidJanitorTest do
 
   defp rows_for(pid) do
     :ets.match_object(BoidPositions.table_name(), {{:_, :_, pid}, :_})
-  end
-
-  # The janitor hears about deaths asynchronously, so check a few times before failing.
-  defp assert_eventually(condition, attempts_left \\ 50) do
-    cond do
-      condition.() ->
-        :ok
-
-      attempts_left == 0 ->
-        flunk("condition was never met")
-
-      true ->
-        Process.sleep(10)
-        assert_eventually(condition, attempts_left - 1)
-    end
   end
 end

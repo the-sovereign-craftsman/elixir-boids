@@ -19,6 +19,24 @@ defmodule Boids.BoidTest do
       assert y >= 0 and y < 1000
       assert_in_delta speed_of(velocity), BoidFlockingConfig.boid_initial_speed(), 0.0001
     end
+
+    # A restarted boid is a new one, so the canvas can tell which boids just replaced
+    # killed ones by how recently they were spawned.
+    test "records when the boid was spawned" do
+      before_ms = System.monotonic_time(:millisecond)
+      %Boid{spawned_at_ms: spawned_at_ms} = Boid.new()
+
+      assert spawned_at_ms >= before_ms
+      assert spawned_at_ms <= System.monotonic_time(:millisecond)
+    end
+  end
+
+  describe "advance_boid/3 spawn time" do
+    test "keeps the boid's spawn time as it moves" do
+      boid = %Boid{position: {10.0, 10.0}, velocity: {2.0, 2.0}, spawned_at_ms: 12_345}
+
+      assert %Boid{spawned_at_ms: 12_345} = Boid.advance_boid(boid, [], @all_rules_on)
+    end
   end
 
   # Velocities in this block have speeds between the min (2) and max (4) speed, so the

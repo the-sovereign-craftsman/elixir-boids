@@ -117,8 +117,9 @@ defmodule Boids.SimulationMetrics do
   @spec build_snapshot(sample(), sample()) :: snapshot()
   def build_snapshot(previous_sample, current_sample) do
     elapsed_seconds = (current_sample.sampled_at_ms - previous_sample.sampled_at_ms) / 1000
-    ticks_per_second = (current_sample.tick_count - previous_sample.tick_count) / elapsed_seconds
-    restarts = current_sample.restart_count - previous_sample.restart_count
+
+    ticks_per_second =
+      per_second(current_sample.tick_count - previous_sample.tick_count, elapsed_seconds)
 
     {scheduler_utilization_percent, scheduler_utilization_percent_by_scheduler} =
       scheduler_utilization_percents(
@@ -131,7 +132,8 @@ defmodule Boids.SimulationMetrics do
       total_process_count: current_sample.total_process_count,
       tick_rate_hz: tick_rate_per_boid(ticks_per_second, current_sample.boid_process_count),
       restart_count: current_sample.restart_count,
-      restarts_per_second: restarts / elapsed_seconds,
+      restarts_per_second:
+        per_second(current_sample.restart_count - previous_sample.restart_count, elapsed_seconds),
       scheduler_utilization_percent: scheduler_utilization_percent,
       scheduler_utilization_percent_by_scheduler: scheduler_utilization_percent_by_scheduler,
       total_memory_bytes: current_sample.total_memory_bytes,
@@ -164,22 +166,29 @@ defmodule Boids.SimulationMetrics do
 
   # Ticks are counted across all boids, so dividing by the boid count gives
   # how often each boid ticked. With no boids nothing ticked.
+  # Two samples in the same millisecond, like one sent by hand just as the timer fires,
+  # leave no time to divide by. 0.0 rather than a crash.
+  defp per_second(_change, elapsed_seconds) when elapsed_seconds == 0, do: 0.0
+  defp per_second(change, elapsed_seconds), do: change / elapsed_seconds
+
   defp tick_rate_per_boid(_ticks_per_second, 0), do: 0.0
   defp tick_rate_per_boid(ticks_per_second, boid_count), do: ticks_per_second / boid_count
 
-  # :scheduler.utilization/2 returns one tuple per measurement. :weighted is the
-  # whole-VM figure; each :normal entry is one scheduler (one per CPU core).
+  # :scheduler.utilization/2 returns one tuple per measurement. Each :normal entry is
+  # one normal scheduler (one per CPU core), which is where the boids run. The overall
+  # figure is their average, so it always agrees with the per-scheduler bars. (Its own
+  # :weighted figure also counts the dirty CPU schedulers, which run long native code
+  # rather than boids, and can read above 100%.)
   defp scheduler_utilization_percents(previous_scheduler_sample, current_scheduler_sample) do
     utilization = :scheduler.utilization(previous_scheduler_sample, current_scheduler_sample)
 
-    [weighted_utilization] =
-      for {:weighted, weighted_utilization, _percent_text} <- utilization,
-          do: weighted_utilization
-
-    utilization_by_scheduler =
+    utilization_percent_by_scheduler =
       for {:normal, _scheduler_id, scheduler_utilization, _percent_text} <- utilization,
           do: scheduler_utilization * 100
 
-    {weighted_utilization * 100, utilization_by_scheduler}
+    average_utilization_percent =
+      Enum.sum(utilization_percent_by_scheduler) / length(utilization_percent_by_scheduler)
+
+    {average_utilization_percent, utilization_percent_by_scheduler}
   end
 end

@@ -18,16 +18,25 @@ defmodule Boids.Boid do
   @boid_max_speed BoidFlockingConfig.boid_max_speed()
   @boid_min_speed BoidFlockingConfig.boid_min_speed()
 
+  # spawned_at_ms is when new/0 made the boid, in System.monotonic_time(:millisecond).
+  # A boid restarted by its supervisor is a new boid with a new spawn time, which is
+  # how the canvas highlights the boids that replaced killed ones. nil for boids built
+  # by hand, as in tests.
   @type t :: %__MODULE__{
           position: {float(), float()},
-          velocity: {float(), float()}
+          velocity: {float(), float()},
+          spawned_at_ms: integer() | nil
         }
 
   @enforce_keys [:position, :velocity]
-  defstruct [:position, :velocity]
+  defstruct [:position, :velocity, spawned_at_ms: nil]
 
   def new do
-    %__MODULE__{position: random_position(), velocity: random_velocity()}
+    %__MODULE__{
+      position: random_position(),
+      velocity: random_velocity(),
+      spawned_at_ms: System.monotonic_time(:millisecond)
+    }
   end
 
   @spec advance_boid(t(), [t()], BoidFlockingRuleToggles.enabled_flocking_rules()) :: t()
@@ -54,7 +63,8 @@ defmodule Boids.Boid do
     {position, velocity} =
       clamp_to_arena({new_x_pos, new_y_pos}, {final_x_velocity, final_y_velocity})
 
-    %__MODULE__{position: position, velocity: velocity}
+    # Updates the boid rather than building a new one, so its spawn time carries over.
+    %__MODULE__{boid | position: position, velocity: velocity}
   end
 
   defp clamp_to_arena({x, y}, {dx, dy}) do

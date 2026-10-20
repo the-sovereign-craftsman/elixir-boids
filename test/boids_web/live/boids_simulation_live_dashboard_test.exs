@@ -22,10 +22,22 @@ defmodule BoidsWeb.BoidsSimulationLiveDashboardTest do
     assert has_element?(view, "#boid-process-count", "4,812")
     assert has_element?(view, "#total-process-count", "5,231")
     assert has_element?(view, "#tick-rate", "29.7")
+    assert has_element?(view, "#restarts-per-second", "0")
     assert has_element?(view, "#restart-count", "0")
     assert has_element?(view, "#scheduler-utilization", "63%")
     assert has_element?(view, "#memory-usage", "182 MB")
     assert has_element?(view, "#memory-per-process", "2.8 KB")
+  end
+
+  # The headline is the last second's restarts, which spikes when boids are killed and
+  # drops back to 0; the running total is shown under it.
+  test "leads with restarts in the last second, with the running total under it", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    send_snapshot(view, snapshot(restarts_per_second: 4000.0, restart_count: 12_500))
+
+    assert has_element?(view, "#restarts-per-second", "4,000")
+    assert has_element?(view, "#restart-count", "12,500")
   end
 
   test "renders one bar per scheduler", %{conn: conn} do

@@ -6,6 +6,8 @@ defmodule BoidsWeb.BoidsSimulationLive do
   alias Boids.Boid
 
   @frame_interval_ms div(1000, 24)
+  # How long a newly spawned boid stays highlighted on the canvas.
+  @new_boid_highlight_ms 1500
 
   # Shown beside each toggle, in this order.
   @flocking_rule_descriptions [
@@ -30,6 +32,7 @@ defmodule BoidsWeb.BoidsSimulationLive do
      |> assign(:target_tick_rate_hz, Boids.target_tick_rate_hz())
      |> assign(:flocking_rule_descriptions, @flocking_rule_descriptions)
      |> assign_flocking_rule_toggles_form(Boids.flocking_rule_toggles())
+     |> assign(:kill_boids_form, to_form(%{"count" => 100}, as: :kill_boids))
      |> assign(:max_boid_count, Boids.max_boid_count())
      |> assign_boid_count(Boids.boid_count())}
   end
@@ -105,6 +108,21 @@ defmodule BoidsWeb.BoidsSimulationLive do
               </div>
             </div>
           </section>
+
+          <section id="failure-controls" class="card bg-base-200">
+            <div class="card-body gap-4">
+              <h2 class="card-title">Break things</h2>
+              <p class="text-xs text-base-content/70">
+                Kill random boid processes. Their supervisor replaces each one within
+                milliseconds, so the boid count barely moves. The new boids flash red.
+              </p>
+
+              <.form for={@kill_boids_form} id="kill-boids-form" phx-submit="kill_boids">
+                <.input field={@kill_boids_form[:count]} type="number" label="Boids to kill" min="1" />
+                <.button id="kill-boids-button" class="btn btn-sm btn-error">Kill</.button>
+              </.form>
+            </div>
+          </section>
         </div>
 
         <canvas
@@ -132,6 +150,9 @@ defmodule BoidsWeb.BoidsSimulationLive do
             const ctx = this.el.getContext("2d")
             const size = 4
 
+            // Each position is [x, y, newness]. Every boid is drawn blue, then boids
+            // spawned in the last moments are drawn again in red on top, fading out as
+            // newness falls from 1 to 0. That's how replaced boids show up after a kill.
             this.handleEvent("update_boid_positions", ({positions}) => {
               ctx.clearRect(0, 0, this.el.width, this.el.height)
               ctx.fillStyle = "#3b82f6"
@@ -139,6 +160,17 @@ defmodule BoidsWeb.BoidsSimulationLive do
               for (const [x, y] of positions) {
                 ctx.fillRect(x - size / 2, y - size / 2, size, size)
               }
+
+              ctx.fillStyle = "#ef4444"
+
+              for (const [x, y, newness] of positions) {
+                if (newness > 0) {
+                  ctx.globalAlpha = newness
+                  ctx.fillRect(x - size / 2, y - size / 2, size, size)
+                }
+              }
+
+              ctx.globalAlpha = 1
             })
           }
         }
@@ -189,6 +221,21 @@ defmodule BoidsWeb.BoidsSimulationLive do
     {:noreply, assign_boid_count(socket, Boids.boid_count())}
   end
 
+  def handle_event("kill_boids", %{"kill_boids" => %{"count" => count}}, socket) do
+    case Integer.parse(count) do
+      {kill_count, ""} when kill_count >= 1 ->
+        killed_count = Boids.kill_boids(kill_count)
+
+        {:noreply,
+         socket
+         |> assign(:kill_boids_form, to_form(%{"count" => kill_count}, as: :kill_boids))
+         |> put_flash(:info, "Killed #{killed_count} boids.")}
+
+      _not_a_whole_number ->
+        {:noreply, put_flash(socket, :error, "Enter a whole number of boids, 1 or more.")}
+    end
+  end
+
   def handle_event("update_all_flocking_rule_toggles", %{"enabled" => enabled}, socket) do
     Boids.update_all_flocking_rule_toggles(enabled == "true")
 
@@ -208,9 +255,13 @@ defmodule BoidsWeb.BoidsSimulationLive do
   end
 
   def handle_info(:render_frame, socket) do
+    now_ms = System.monotonic_time(:millisecond)
+
     positions =
       Boids.list_boid_positions()
-      |> Enum.map(fn {{_cell_x, _cell_y, _pid}, %Boid{position: {x, y}}} -> [x, y] end)
+      |> Enum.map(fn {{_cell_x, _cell_y, _pid}, %Boid{position: {x, y}} = boid} ->
+        [x, y, newness(boid, now_ms)]
+      end)
 
     Process.send_after(self(), :render_frame, @frame_interval_ms)
 
@@ -220,6 +271,16 @@ defmodule BoidsWeb.BoidsSimulationLive do
      socket
      |> assign(:boid_count, Boids.boid_count())
      |> push_event("update_boid_positions", %{positions: positions})}
+  end
+
+  # 1.0 for a boid spawned this instant, falling to 0.0 over @new_boid_highlight_ms,
+  # then 0.0. The canvas draws it as a red highlight that fades, so the boids that
+  # replaced killed ones stand out. Rounded, because it's sent for every boid every frame.
+  defp newness(%Boid{spawned_at_ms: nil}, _now_ms), do: 0.0
+
+  defp newness(%Boid{spawned_at_ms: spawned_at_ms}, now_ms) do
+    age_ms = now_ms - spawned_at_ms
+    Float.round(max(1 - age_ms / @new_boid_highlight_ms, 0.0), 2)
   end
 
   defp put_limit_flash(socket, target_count) do
