@@ -12,6 +12,10 @@ defmodule Boids.BoidFlockingRuleToggles do
   write to it. Changes go through `update_flocking_rule_toggles/2`, which sends a
   `GenServer.call` so they are applied one at a time. Reads go straight to ETS,
   so boids never wait on this process.
+
+  Every change is broadcast on `Boids.PubSub`, so anything showing the toggles
+  (like the LiveView) stays in sync, whether the change came from the page or
+  from iex. Subscribe with `subscribe_to_flocking_rule_toggles/0`.
   """
 
   use GenServer
@@ -19,6 +23,7 @@ defmodule Boids.BoidFlockingRuleToggles do
   @table_name :boid_flocking_rule_toggles
   @enabled_flocking_rules_key :enabled_flocking_rules
   @flocking_rules [:separation, :cohesion, :alignment]
+  @pubsub_topic "flocking_rule_toggles"
 
   @typedoc "A key for the table's only row. It is always this atom."
   @type row_key :: :enabled_flocking_rules
@@ -68,6 +73,16 @@ defmodule Boids.BoidFlockingRuleToggles do
   end
 
   @doc """
+  Subscribes the calling process to toggle changes. After every change it
+  receives `{:flocking_rule_toggles_updated, flocking_rule_toggles}`, with
+  the state of every rule.
+  """
+  @spec subscribe_to_flocking_rule_toggles() :: :ok | {:error, term()}
+  def subscribe_to_flocking_rule_toggles do
+    Phoenix.PubSub.subscribe(Boids.PubSub, @pubsub_topic)
+  end
+
+  @doc """
   Returns the current enabled/disabled state for each flocking rule
   """
   @spec flocking_rule_toggles() :: enabled_flocking_rules()
@@ -98,6 +113,12 @@ defmodule Boids.BoidFlockingRuleToggles do
     updated_flocking_rules = Map.put(enabled_flocking_rules, rule, enabled?)
 
     :ets.insert(@table_name, {@enabled_flocking_rules_key, updated_flocking_rules})
+
+    Phoenix.PubSub.broadcast(
+      Boids.PubSub,
+      @pubsub_topic,
+      {:flocking_rule_toggles_updated, updated_flocking_rules}
+    )
 
     {:reply, :ok, state}
   end

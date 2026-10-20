@@ -150,6 +150,48 @@ defmodule Boids.BoidFlockingRuleTogglesTest do
     end
   end
 
+  describe "subscribe_to_flocking_rule_toggles/0" do
+    test "subscribers get the new state of every rule after a change" do
+      :ok = BoidFlockingRuleToggles.subscribe_to_flocking_rule_toggles()
+
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:cohesion, true)
+
+      assert_receive {:flocking_rule_toggles_updated,
+                      %{separation: false, cohesion: true, alignment: false}}
+    end
+
+    test "turning every rule on sends one update per rule, ending with all on" do
+      :ok = BoidFlockingRuleToggles.subscribe_to_flocking_rule_toggles()
+
+      BoidFlockingRuleToggles.update_all_flocking_rule_toggles(true)
+
+      assert_receive {:flocking_rule_toggles_updated, _first_update}
+      assert_receive {:flocking_rule_toggles_updated, _second_update}
+
+      assert_receive {:flocking_rule_toggles_updated,
+                      %{separation: true, cohesion: true, alignment: true}}
+    end
+
+    test "a rejected change sends nothing" do
+      :ok = BoidFlockingRuleToggles.subscribe_to_flocking_rule_toggles()
+
+      assert_raise FunctionClauseError, fn ->
+        # credo:disable-for-next-line Credo.Check.Refactor.Apply
+        apply(BoidFlockingRuleToggles, :update_flocking_rule_toggles, [:cohesoin, true])
+      end
+
+      refute_receive {:flocking_rule_toggles_updated, _flocking_rule_toggles}
+    end
+  end
+
+  describe "Boids.flocking_rule_toggles/0" do
+    test "returns the toggles from Boids.BoidFlockingRuleToggles" do
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:separation, true)
+
+      assert Boids.flocking_rule_toggles() == BoidFlockingRuleToggles.flocking_rule_toggles()
+    end
+  end
+
   describe "flocking_rule_toggles/0" do
     test "returns the map stored in the table" do
       [{:enabled_flocking_rules, stored_toggles}] =

@@ -25,6 +25,12 @@ defmodule Boids do
     :ets.tab2list(BoidPositions.table_name())
   end
 
+  @doc "Whether each flocking rule is on. See `Boids.BoidFlockingRuleToggles`."
+  defdelegate flocking_rule_toggles(), to: BoidFlockingRuleToggles
+
+  @doc "Subscribes the caller to flocking rule toggle changes. See `Boids.BoidFlockingRuleToggles`."
+  defdelegate subscribe_to_flocking_rule_toggles(), to: BoidFlockingRuleToggles
+
   @doc "Turns every flocking rule on or off. See `Boids.BoidFlockingRuleToggles`."
   defdelegate update_all_flocking_rule_toggles(enabled?), to: BoidFlockingRuleToggles
 
