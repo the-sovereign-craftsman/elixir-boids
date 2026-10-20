@@ -110,6 +110,46 @@ defmodule Boids.BoidFlockingRuleTogglesTest do
     end
   end
 
+  describe "update_all_flocking_rule_toggles/1" do
+    test "returns :ok" do
+      assert BoidFlockingRuleToggles.update_all_flocking_rule_toggles(true) == :ok
+    end
+
+    test "turns every rule on" do
+      BoidFlockingRuleToggles.update_all_flocking_rule_toggles(true)
+
+      assert BoidFlockingRuleToggles.flocking_rule_toggles() ==
+               %{separation: true, cohesion: true, alignment: true}
+    end
+
+    test "turns every rule off" do
+      BoidFlockingRuleToggles.update_all_flocking_rule_toggles(true)
+      BoidFlockingRuleToggles.update_all_flocking_rule_toggles(false)
+
+      assert BoidFlockingRuleToggles.flocking_rule_toggles() ==
+               %{separation: false, cohesion: false, alignment: false}
+    end
+
+    test "overrides a mix of rules that were on and off" do
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:cohesion, true)
+
+      BoidFlockingRuleToggles.update_all_flocking_rule_toggles(true)
+
+      assert BoidFlockingRuleToggles.flocking_rule_toggles() ==
+               %{separation: true, cohesion: true, alignment: true}
+    end
+
+    test "rejects a value that isn't a boolean without changing the table" do
+      assert_raise FunctionClauseError, fn ->
+        # credo:disable-for-next-line Credo.Check.Refactor.Apply
+        apply(BoidFlockingRuleToggles, :update_all_flocking_rule_toggles, ["true"])
+      end
+
+      assert BoidFlockingRuleToggles.flocking_rule_toggles() ==
+               %{separation: false, cohesion: false, alignment: false}
+    end
+  end
+
   describe "flocking_rule_toggles/0" do
     test "returns the map stored in the table" do
       [{:enabled_flocking_rules, stored_toggles}] =
@@ -147,6 +187,15 @@ defmodule Boids.BoidFlockingRuleTogglesTest do
                cohesion: false,
                alignment: false
              }
+    end
+  end
+
+  describe "Boids.update_all_flocking_rule_toggles/1" do
+    test "changes every toggle through Boids.BoidFlockingRuleToggles" do
+      assert Boids.update_all_flocking_rule_toggles(true) == :ok
+
+      assert BoidFlockingRuleToggles.flocking_rule_toggles() ==
+               %{separation: true, cohesion: true, alignment: true}
     end
   end
 

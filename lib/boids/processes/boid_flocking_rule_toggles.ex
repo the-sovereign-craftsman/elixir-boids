@@ -43,6 +43,19 @@ defmodule Boids.BoidFlockingRuleToggles do
   end
 
   @doc """
+  Turns every flocking rule on or off at once.
+
+  Updates each rule in turn through `update_flocking_rule_toggles/2`. Only
+  accepts a boolean; anything else raises `FunctionClauseError` before any rule
+  changes.
+  """
+  @spec update_all_flocking_rule_toggles(boolean()) :: :ok
+  def update_all_flocking_rule_toggles(enabled?) when is_boolean(enabled?) do
+    @flocking_rules
+    |> Enum.each(fn rule -> update_flocking_rule_toggles(rule, enabled?) end)
+  end
+
+  @doc """
   Turns one flocking rule on or off.
 
   Only accepts a known rule and a boolean. Anything else raises
