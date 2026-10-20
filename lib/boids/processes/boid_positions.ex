@@ -53,23 +53,40 @@ defmodule Boids.BoidPositions do
   @spec boids_within_radius(BoidSpatialGrid.position(), pos_integer(), pid()) :: [Boid.t()]
   def boids_within_radius({position_x, position_y} = position, radius, pid)
       when radius <= @max_query_radius do
-    radius_squared = radius * radius
+    match_spec_guards = [
+      {:"=/=", :"$1", pid},
+      {:"=<", squared_distance_to(position_x, position_y), radius * radius}
+    ]
 
     position
     |> BoidSpatialGrid.cell_for_position()
     |> BoidSpatialGrid.surrounding_cells()
-    |> Enum.flat_map(&rows_in_cell/1)
-    |> Enum.reject(fn {{_cell_x, _cell_y, row_pid}, _boid} -> row_pid == pid end)
-    |> Enum.filter(fn {_key, %Boid{position: {neighbor_x, neighbor_y}}} ->
-      delta_x = neighbor_x - position_x
-      delta_y = neighbor_y - position_y
-      delta_x * delta_x + delta_y * delta_y <= radius_squared
-    end)
-    |> Enum.map(fn {_key, boid} -> boid end)
+    |> Enum.flat_map(&boids_in_cell_matching(&1, match_spec_guards))
   end
 
-  @spec rows_in_cell(BoidSpatialGrid.cell()) :: [row()]
-  defp rows_in_cell({cell_x, cell_y}) do
-    :ets.match_object(@table_name, {{cell_x, cell_y, :_}, :_})
+  # Reading a row copies it out of ETS into the reading process. So rather than copying
+  # every row in the cell and filtering in Elixir, the match spec runs the filter inside
+  # ETS, and only the boids that pass are copied out. The 3x3 cells searched cover about
+  # three times the area of the perception circle, so about two thirds of the rows are
+  # never copied.
+  #
+  # In the match spec, $1 is the row's pid and $2 and $3 are the boid's x and y. Binding
+  # the cell in the key keeps each select a range scan over one cell, not the whole table.
+  @spec boids_in_cell_matching(BoidSpatialGrid.cell(), list()) :: [Boid.t()]
+  defp boids_in_cell_matching({cell_x, cell_y}, match_spec_guards) do
+    row_pattern = {{cell_x, cell_y, :"$1"}, %{position: {:"$2", :"$3"}}}
+    # :"$_" is the whole matched row, {key, boid}; element 2 is the boid.
+    returned_boid = {:element, 2, :"$_"}
+
+    :ets.select(@table_name, [{row_pattern, match_spec_guards, [returned_boid]}])
+  end
+
+  # The squared distance from {position_x, position_y} to the row's boid, as a match
+  # spec expression: (x - position_x)^2 + (y - position_y)^2. Compared against the
+  # squared radius, which avoids a square root.
+  defp squared_distance_to(position_x, position_y) do
+    delta_x = {:-, :"$2", position_x}
+    delta_y = {:-, :"$3", position_y}
+    {:+, {:*, delta_x, delta_x}, {:*, delta_y, delta_y}}
   end
 end
