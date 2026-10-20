@@ -39,39 +39,84 @@ defmodule Boids.BoidsSpawningTest do
     end
   end
 
-  describe "spawn_boids_up_to_limit/1" do
-    test "spawns the requested number when there is room, and returns it" do
-      assert Boids.spawn_boids_up_to_limit(10) == 10
+  describe "set_boid_count/1" do
+    test "spawns boids up to the target and returns the new count" do
+      Boids.spawn_boids(2)
+
+      assert Boids.set_boid_count(10) == 10
       assert Boids.boid_count() == 10
     end
 
-    test "stops at the limit and returns how many it actually spawned" do
-      Boids.spawn_boids(Boids.max_boid_count() - 5)
+    test "removes boids down to the target and returns the new count" do
+      Boids.spawn_boids(10)
 
-      assert Boids.spawn_boids_up_to_limit(20) == 5
-      assert Boids.boid_count() == Boids.max_boid_count()
+      assert Boids.set_boid_count(4) == 4
+      assert Boids.boid_count() == 4
     end
 
-    test "spawns nothing once the limit is reached" do
-      Boids.spawn_boids(Boids.max_boid_count())
+    test "does nothing when the count already matches" do
+      pids = Boids.spawn_boids(5)
 
-      assert Boids.spawn_boids_up_to_limit(1) == 0
-      assert Boids.boid_count() == Boids.max_boid_count()
+      assert Boids.set_boid_count(5) == 5
+      assert Enum.all?(pids, &Process.alive?/1)
     end
 
-    test "spawns nothing when there are already more boids than the limit, as from iex" do
-      Boids.spawn_boids(Boids.max_boid_count() + 2)
+    test "can take the flock down to 0" do
+      Boids.spawn_boids(6)
 
-      assert Boids.spawn_boids_up_to_limit(1) == 0
-      assert Boids.boid_count() == Boids.max_boid_count() + 2
+      assert Boids.set_boid_count(0) == 0
+      assert Boids.boid_count() == 0
+    end
+
+    test "caps the target at the limit" do
+      assert Boids.set_boid_count(Boids.max_boid_count() + 100) == Boids.max_boid_count()
+    end
+
+    test "brings a flock over the limit, as from iex, down to the limit" do
+      Boids.spawn_boids(Boids.max_boid_count() + 3)
+
+      assert Boids.set_boid_count(Boids.max_boid_count() + 50) == Boids.max_boid_count()
     end
   end
 
-  # Stops every boid and removes its row; rows aren't cleaned up on their own yet.
-  defp stop_all_boids do
-    for {_id, pid, _type, _modules} <- DynamicSupervisor.which_children(Boids.DynamicSupervisor) do
-      DynamicSupervisor.terminate_child(Boids.DynamicSupervisor, pid)
-      :ets.match_delete(BoidPositions.table_name(), {{:_, :_, pid}, :_})
+  describe "remove_boids/1" do
+    test "stops the requested number of boids" do
+      Boids.spawn_boids(5)
+
+      assert Boids.remove_boids(2) == :ok
+      assert Boids.boid_count() == 3
+    end
+
+    test "removing more boids than exist stops them all" do
+      Boids.spawn_boids(3)
+
+      Boids.remove_boids(10)
+
+      assert Boids.boid_count() == 0
+    end
+
+    test "removed boids leave no rows behind, so nothing stays frozen on the canvas" do
+      pids = Boids.spawn_boids(4)
+
+      Boids.remove_boids(4)
+
+      for pid <- pids do
+        assert rows_for(pid) == []
+      end
     end
   end
+
+  describe "remove_all_boids/0" do
+    test "stops every boid and removes every row" do
+      pids = Boids.spawn_boids(8)
+
+      assert Boids.remove_all_boids() == :ok
+      assert Boids.boid_count() == 0
+      assert Enum.flat_map(pids, &rows_for/1) == []
+    end
+  end
+
+  defp rows_for(pid), do: :ets.match_object(BoidPositions.table_name(), {{:_, :_, pid}, :_})
+
+  defp stop_all_boids, do: Boids.remove_all_boids()
 end

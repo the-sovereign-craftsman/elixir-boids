@@ -10,7 +10,8 @@ defmodule Boids.BoidPositions do
   this process.
 
   This process exists only so the table has a supervised, long-lived owner.
-  Rows of boids that die are not yet cleaned up.
+  Each boid deletes its own row when it stops (see `Boids.BoidServer`), except
+  one killed with `Process.exit(pid, :kill)`, whose row is left behind.
   """
 
   use GenServer

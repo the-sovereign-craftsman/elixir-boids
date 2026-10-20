@@ -4,7 +4,6 @@ defmodule BoidsWeb.BoidsSimulationLive do
   alias Boids.Boid
 
   @frame_interval_ms div(1000, 24)
-  @default_spawn_count "500"
 
   # Shown beside each toggle, in this order.
   @flocking_rule_descriptions [
@@ -24,9 +23,8 @@ defmodule BoidsWeb.BoidsSimulationLive do
      socket
      |> assign(:flocking_rule_descriptions, @flocking_rule_descriptions)
      |> assign_flocking_rule_toggles_form(Boids.flocking_rule_toggles())
-     |> assign(:boid_count, Boids.boid_count())
      |> assign(:max_boid_count, Boids.max_boid_count())
-     |> assign(:spawn_boids_form, to_form(%{"count" => @default_spawn_count}, as: :spawn_boids))}
+     |> assign_boid_count(Boids.boid_count())}
   end
 
   @impl true
@@ -36,27 +34,27 @@ defmodule BoidsWeb.BoidsSimulationLive do
       <%!-- Controls beside the canvas from md up; the telemetry column joins at xl. --%>
       <div class="grid items-start gap-6 md:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)_16rem]">
         <div id="simulation-controls" class="flex flex-col gap-6">
-          <section id="boid-spawning" class="card bg-base-200">
+          <section id="flock-size-controls" class="card bg-base-200">
             <div class="card-body gap-4">
               <h2 class="card-title">Boids</h2>
               <p id="boid-count" class="text-sm">{@boid_count} / {@max_boid_count}</p>
 
-              <.form for={@spawn_boids_form} id="spawn-boids-form" phx-submit="spawn_boids">
+              <.form for={@flock_size_form} id="flock-size-form" phx-submit="set_flock_size">
                 <.input
-                  field={@spawn_boids_form[:count]}
+                  field={@flock_size_form[:count]}
                   type="number"
-                  label="How many to spawn"
-                  min="1"
+                  label="Flock size"
+                  min="0"
                   max={@max_boid_count}
                 />
-                <.button
-                  id="spawn-boids-button"
-                  class="btn btn-sm btn-primary"
-                  disabled={@boid_count >= @max_boid_count}
-                >
-                  Spawn
+                <.button id="set-flock-size-button" class="btn btn-sm btn-primary">
+                  Apply
                 </.button>
               </.form>
+
+              <.button id="clear-boids-button" class="btn btn-sm btn-soft" phx-click="clear_boids">
+                Clear all boids
+              </.button>
             </div>
           </section>
 
@@ -157,21 +155,25 @@ defmodule BoidsWeb.BoidsSimulationLive do
     {:noreply, socket}
   end
 
-  def handle_event("spawn_boids", %{"spawn_boids" => %{"count" => count} = spawn_params}, socket) do
-    socket = assign(socket, :spawn_boids_form, to_form(spawn_params, as: :spawn_boids))
-
+  def handle_event("set_flock_size", %{"flock_size" => %{"count" => count}}, socket) do
     case Integer.parse(count) do
-      {requested_count, ""} when requested_count > 0 ->
-        spawned_count = Boids.spawn_boids_up_to_limit(requested_count)
+      {target_count, ""} when target_count >= 0 ->
+        new_count = Boids.set_boid_count(target_count)
 
         {:noreply,
          socket
-         |> assign(:boid_count, Boids.boid_count())
-         |> put_spawn_flash(requested_count, spawned_count)}
+         |> assign_boid_count(new_count)
+         |> put_limit_flash(target_count)}
 
-      _not_a_positive_whole_number ->
-        {:noreply, put_flash(socket, :error, "Enter a whole number of boids to spawn.")}
+      _not_a_whole_number ->
+        {:noreply, put_flash(socket, :error, "Enter a whole number of boids, 0 or more.")}
     end
+  end
+
+  def handle_event("clear_boids", _params, socket) do
+    Boids.remove_all_boids()
+
+    {:noreply, assign_boid_count(socket, Boids.boid_count())}
   end
 
   def handle_event("update_all_flocking_rule_toggles", %{"enabled" => enabled}, socket) do
@@ -200,16 +202,22 @@ defmodule BoidsWeb.BoidsSimulationLive do
      |> push_event("update_boid_positions", %{positions: positions})}
   end
 
-  defp put_spawn_flash(socket, requested_count, spawned_count)
-       when spawned_count < requested_count do
-    put_flash(
-      socket,
-      :info,
-      "Spawned #{spawned_count} boids (the limit is #{Boids.max_boid_count()})."
-    )
+  defp put_limit_flash(socket, target_count) do
+    max_boid_count = Boids.max_boid_count()
+
+    if target_count > max_boid_count do
+      put_flash(socket, :info, "The flock size is limited to #{max_boid_count} boids.")
+    else
+      socket
+    end
   end
 
-  defp put_spawn_flash(socket, _requested_count, _spawned_count), do: socket
+  # Also resets the flock size input to the real count, so it shows what was applied.
+  defp assign_boid_count(socket, boid_count) do
+    socket
+    |> assign(:boid_count, boid_count)
+    |> assign(:flock_size_form, to_form(%{"count" => boid_count}, as: :flock_size))
+  end
 
   # Forms read their values like submitted params, which have string keys, so the
   # rule atoms (:cohesion) become strings ("cohesion") here.

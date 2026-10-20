@@ -157,6 +157,54 @@ defmodule Boids.BoidServerTest do
     end
   end
 
+  describe "terminate/2" do
+    test "deletes the boid's row when it is stopped" do
+      initial_boid = %Boid{position: {10.0, 10.0}, velocity: {0.0, 0.0}}
+      expect(BoidMock, :new, fn -> initial_boid end)
+
+      pid = start_supervised!({BoidServer, []})
+      assert rows_for(pid) == [{{0, 0, pid}, initial_boid}]
+
+      # Stops it the way a supervisor does, with a :shutdown exit signal.
+      :ok = stop_supervised(BoidServer)
+
+      assert rows_for(pid) == []
+    end
+
+    test "deletes the row from the cell the boid has moved to" do
+      # {40.0, 10.0} is in cell {0, 0}; {60.0, 10.0} is in cell {1, 0}.
+      initial_boid = %Boid{position: {40.0, 10.0}, velocity: {20.0, 0.0}}
+      advanced_boid = %Boid{position: {60.0, 10.0}, velocity: {20.0, 0.0}}
+
+      expect(BoidMock, :new, fn -> initial_boid end)
+      expect(BoidMock, :advance_boid, fn ^initial_boid, _neighbors, _toggles -> advanced_boid end)
+
+      pid = start_supervised!({BoidServer, []})
+      send(pid, :tick)
+      :sys.get_state(pid)
+
+      :ok = stop_supervised(BoidServer)
+
+      assert rows_for(pid) == []
+    end
+
+    test "deletes the row when the boid crashes" do
+      initial_boid = %Boid{position: {10.0, 10.0}, velocity: {0.0, 0.0}}
+      expect(BoidMock, :new, fn -> initial_boid end)
+      expect(BoidMock, :advance_boid, fn _boid, _neighbors, _toggles -> raise "boom" end)
+
+      pid = start_supervised!({BoidServer, []}, restart: :temporary)
+      monitor_ref = Process.monitor(pid)
+
+      ExUnit.CaptureLog.capture_log(fn ->
+        send(pid, :tick)
+        assert_receive {:DOWN, ^monitor_ref, :process, ^pid, _reason}
+      end)
+
+      assert rows_for(pid) == []
+    end
+  end
+
   describe "handle_info/2 neighbor lookup" do
     # These tests use their own regions of the world (x ~725-925, y ~825-975) so
     # rows from other async tests sharing the table can't land in their searches.

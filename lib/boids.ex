@@ -9,7 +9,7 @@ defmodule Boids do
   alias Boids.BoidFlockingRuleToggles
   alias Boids.BoidPositions
 
-  # The most boids the UI will spawn. spawn_boids/1 ignores it, so iex can go past it
+  # The most boids set_boid_count/1 will allow. spawn_boids/1 ignores it, so iex can go past it
   # for performance experiments.
   @max_boid_count 5_000
 
@@ -26,7 +26,7 @@ defmodule Boids do
     Enum.map(1..count//1, fn _ -> spawn_boid() end)
   end
 
-  @doc "The most boids `spawn_boids_up_to_limit/1` will let exist at once."
+  @doc "The most boids `set_boid_count/1` will allow at once."
   @spec max_boid_count() :: pos_integer()
   def max_boid_count, do: @max_boid_count
 
@@ -37,18 +37,37 @@ defmodule Boids do
   end
 
   @doc """
-  Spawns up to `requested_count` boids, but never more than would take the total
-  past `max_boid_count/0`. Returns how many were actually spawned.
+  Spawns or removes boids until there are `target_count`, capped at
+  `max_boid_count/0`. Returns the new number of boids.
   """
-  @spec spawn_boids_up_to_limit(non_neg_integer()) :: non_neg_integer()
-  def spawn_boids_up_to_limit(requested_count)
-      when is_integer(requested_count) and requested_count >= 0 do
-    room_left = max(@max_boid_count - boid_count(), 0)
-    count_to_spawn = min(requested_count, room_left)
+  @spec set_boid_count(non_neg_integer()) :: non_neg_integer()
+  def set_boid_count(target_count) when is_integer(target_count) and target_count >= 0 do
+    capped_target_count = min(target_count, @max_boid_count)
+    current_count = boid_count()
 
-    spawn_boids(count_to_spawn)
-    count_to_spawn
+    cond do
+      capped_target_count > current_count -> spawn_boids(capped_target_count - current_count)
+      capped_target_count < current_count -> remove_boids(current_count - capped_target_count)
+      true -> :ok
+    end
+
+    boid_count()
   end
+
+  @doc "Stops `count` boids. Each one deletes its own row as it stops."
+  @spec remove_boids(non_neg_integer()) :: :ok
+  def remove_boids(count) when is_integer(count) and count >= 0 do
+    Boids.DynamicSupervisor
+    |> DynamicSupervisor.which_children()
+    |> Enum.take(count)
+    |> Enum.each(fn {_id, pid, _type, _modules} ->
+      DynamicSupervisor.terminate_child(Boids.DynamicSupervisor, pid)
+    end)
+  end
+
+  @doc "Stops every boid."
+  @spec remove_all_boids() :: :ok
+  def remove_all_boids, do: remove_boids(boid_count())
 
   @spec list_boid_positions() :: [{pid(), Boids.Boid.t()}]
   def list_boid_positions do
