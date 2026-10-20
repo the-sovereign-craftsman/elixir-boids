@@ -19,6 +19,8 @@ defmodule Boids.SimulationMetrics do
 
   use GenServer
 
+  alias Boids.BoidJanitor
+
   # How many snapshots the dashboard's sparklines show: one minute at one per second.
   @history_length 60
   @sample_interval_ms 1000
@@ -155,8 +157,8 @@ defmodule Boids.SimulationMetrics do
       total_process_count: :erlang.system_info(:process_count),
       total_memory_bytes: :erlang.memory(:total),
       process_memory_bytes: :erlang.memory(:processes),
-      # Stays 0 until the BoidJanitor counts crashes (phase 2).
-      restart_count: 0
+      # Every crash of a boid leads to one restart by its supervisor.
+      restart_count: BoidJanitor.crash_count()
     }
   end
 

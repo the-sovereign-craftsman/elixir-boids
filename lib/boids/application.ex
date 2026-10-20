@@ -15,7 +15,13 @@ defmodule Boids.Application do
       Boids.BoidPositions,
       # Before the boids, so the toggles table exists before any boid ticks.
       Boids.BoidFlockingRuleToggles,
-      {DynamicSupervisor, name: Boids.DynamicSupervisor, strategy: :one_for_one},
+      # Before the boids, which register with it as they start.
+      Boids.BoidJanitor,
+      # The default limit is 3 restarts in 5 seconds. Past it the supervisor gives up
+      # and stops every boid, so killing even a handful at once would end the whole
+      # flock. The failure demos kill hundreds, so the limit is raised far past that.
+      {DynamicSupervisor,
+       name: Boids.DynamicSupervisor, strategy: :one_for_one, max_restarts: 10_000, max_seconds: 1},
       # After the boid supervisor, because each sample counts its children. No boid
       # starts at boot, so the tick counter still exists before any boid ticks.
       Boids.SimulationMetrics,

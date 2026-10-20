@@ -11,8 +11,8 @@ defmodule Boids.BoidServer do
   When it stops, it deletes its own row in `terminate/2`, so a removed boid
   doesn't stay frozen on the canvas or keep counting as a neighbor. It traps
   exits so that `terminate/2` also runs when its supervisor stops it. A boid
-  killed with `Process.exit(pid, :kill)` skips `terminate/2` and still leaves
-  its row behind.
+  killed with `Process.exit(pid, :kill)` skips `terminate/2`, so it also
+  registers with `Boids.BoidJanitor`, which deletes the row when the boid dies.
 
   The server holds no simulation logic of its own; that lives in the boid
   module (`Boids.Boid` by default).
@@ -22,6 +22,7 @@ defmodule Boids.BoidServer do
 
   alias Boids.BoidFlockingConfig
   alias Boids.BoidFlockingRuleToggles
+  alias Boids.BoidJanitor
   alias Boids.BoidPositions
   alias Boids.BoidSpatialGrid
   alias Boids.SimulationMetrics
@@ -35,6 +36,8 @@ defmodule Boids.BoidServer do
     # Turns the supervisor's shutdown signal into a message, so GenServer runs
     # terminate/2 (and deletes this boid's row) before the process exits.
     Process.flag(:trap_exit, true)
+    # The janitor deletes this boid's row if it dies without running terminate/2.
+    BoidJanitor.watch_boid(self())
 
     boid = boid_module().new()
     {cell_x, cell_y} = BoidSpatialGrid.cell_for_position(boid.position)
