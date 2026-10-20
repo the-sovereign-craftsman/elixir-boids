@@ -52,15 +52,8 @@ defmodule Boids.BoidServer do
   def handle_info(:tick, boid) do
     {old_cell_x, old_cell_y} = old_cell = BoidSpatialGrid.cell_for_position(boid.position)
 
-    # Look up neighbors and filter based on perception radius
-    neighbors =
-      BoidPositions.boids_within_radius(
-        boid.position,
-        BoidFlockingConfig.boid_perception_radius(),
-        self()
-      )
-
     flocking_rule_toggles = BoidFlockingRuleToggles.flocking_rule_toggles()
+    neighbors = neighbors_for(boid, flocking_rule_toggles)
 
     new_boid = boid_module().advance_boid(boid, neighbors, flocking_rule_toggles)
     {new_cell_x, new_cell_y} = new_cell = BoidSpatialGrid.cell_for_position(new_boid.position)
@@ -84,6 +77,21 @@ defmodule Boids.BoidServer do
     if :ets.whereis(BoidPositions.table_name()) != :undefined do
       {cell_x, cell_y} = BoidSpatialGrid.cell_for_position(boid.position)
       :ets.delete(BoidPositions.table_name(), {cell_x, cell_y, self()})
+    end
+  end
+
+  # Neighbors only feed the flocking rules. Looking them up copies every nearby row out
+  # of ETS into this process, so with every rule off it's skipped: 5,000 boids would
+  # otherwise copy neighbor lists they never use, every tick.
+  defp neighbors_for(boid, flocking_rule_toggles) do
+    if Enum.any?(flocking_rule_toggles, fn {_rule, enabled?} -> enabled? end) do
+      BoidPositions.boids_within_radius(
+        boid.position,
+        BoidFlockingConfig.boid_perception_radius(),
+        self()
+      )
+    else
+      []
     end
   end
 
