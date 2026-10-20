@@ -189,6 +189,17 @@ defmodule BoidsWeb.BoidsSimulationLive do
                   </div>
                 </div>
               </div>
+
+              <div class="border-t border-base-300 pt-4">
+                <.button
+                  id="kill-boid-positions-owner-button"
+                  class="btn btn-sm btn-error btn-outline"
+                  phx-click="kill_boid_positions_owner"
+                  data-confirm="This kills the process that owns the positions table. Continue?"
+                >
+                  Kill the positions table owner
+                </.button>
+              </div>
             </div>
           </section>
         </div>
@@ -311,6 +322,12 @@ defmodule BoidsWeb.BoidsSimulationLive do
       _not_a_whole_number ->
         {:noreply, put_flash(socket, :error, "Enter a whole number of boids, 1 or more.")}
     end
+  end
+
+  def handle_event("kill_boid_positions_owner", _params, socket) do
+    Boids.kill_boid_positions_owner()
+
+    {:noreply, socket}
   end
 
   def handle_event("start_cpu_hog", _params, socket) do

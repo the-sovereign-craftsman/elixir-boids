@@ -9,9 +9,11 @@ defmodule Boids.BoidPositions do
   boid processes write their own rows directly, without a bottleneck through
   this process.
 
-  This process exists only so the table has a supervised, long-lived owner.
-  Each boid deletes its own row when it stops (see `Boids.BoidServer`), except
-  one killed with `Process.exit(pid, :kill)`, whose row is left behind.
+  This process exists only so the table has a supervised, long-lived owner. An
+  ETS table is deleted when its owner dies, so this process dying takes every row
+  with it (see `Boids.kill_boid_positions_owner/0`). Each boid deletes its own row
+  when it stops (see `Boids.BoidServer`), and `Boids.BoidJanitor` deletes the rows
+  of boids killed with `Process.exit(pid, :kill)`.
   """
 
   use GenServer
@@ -31,7 +33,8 @@ defmodule Boids.BoidPositions do
   def table_name, do: @table_name
 
   def start_link(_opts) do
-    GenServer.start_link(__MODULE__, :ok)
+    # Registered so the failure demo can find it (Boids.kill_boid_positions_owner/0).
+    GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
   end
 
   @impl true

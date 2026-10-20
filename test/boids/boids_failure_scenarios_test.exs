@@ -21,7 +21,7 @@ defmodule Boids.BoidsFailureScenariosTest do
 
   describe "kill_boids/1" do
     test "kills the requested number of boids and the supervisor restarts them" do
-      Boids.spawn_boids(10)
+      spawn_watched_boids(10)
       pids_before_kill = running_boid_pids()
       crash_count_before = Boids.boid_crash_count()
 
@@ -34,7 +34,7 @@ defmodule Boids.BoidsFailureScenariosTest do
     end
 
     test "killing more boids than exist kills them all" do
-      Boids.spawn_boids(3)
+      spawn_watched_boids(3)
       pids_before_kill = running_boid_pids()
       crash_count_before = Boids.boid_crash_count()
 
@@ -45,7 +45,7 @@ defmodule Boids.BoidsFailureScenariosTest do
     end
 
     test "killing 0 boids kills nothing" do
-      Boids.spawn_boids(2)
+      spawn_watched_boids(2)
 
       assert Boids.kill_boids(0) == 0
       assert Boids.boid_count() == 2
@@ -54,7 +54,7 @@ defmodule Boids.BoidsFailureScenariosTest do
     # The default limit of 3 restarts in 5 seconds would make the supervisor give up and
     # stop every boid. The raised limit keeps it, and the whole flock, alive.
     test "survives more kills than the default restart limit allows" do
-      Boids.spawn_boids(20)
+      spawn_watched_boids(20)
       pids_before_kill = running_boid_pids()
       supervisor_pid = Process.whereis(Boids.DynamicSupervisor)
 
@@ -71,7 +71,7 @@ defmodule Boids.BoidsFailureScenariosTest do
   describe "crash_boids/1" do
     @tag :capture_log
     test "corrupted boids crash on their next tick and the supervisor restarts them" do
-      Boids.spawn_boids(10)
+      spawn_watched_boids(10)
       pids_before_crash = running_boid_pids()
       crash_count_before = Boids.boid_crash_count()
 
@@ -84,7 +84,7 @@ defmodule Boids.BoidsFailureScenariosTest do
     end
 
     test "a corrupted boid keeps running until its next tick" do
-      Boids.spawn_boids(1)
+      spawn_watched_boids(1)
       [pid] = running_boid_pids()
 
       Boids.crash_boids(1)
@@ -95,7 +95,7 @@ defmodule Boids.BoidsFailureScenariosTest do
 
     @tag :capture_log
     test "crashing more boids than exist crashes them all" do
-      Boids.spawn_boids(3)
+      spawn_watched_boids(3)
       pids_before_crash = running_boid_pids()
 
       assert Boids.crash_boids(50) == 3
@@ -106,4 +106,29 @@ defmodule Boids.BoidsFailureScenariosTest do
   end
 
   defp tick_every_boid(pids), do: Enum.each(pids, &send(&1, :tick))
+end
+
+defmodule Boids.BoidPositionsOwnerKillTest do
+  # Not async: this kills the app-wide positions table owner, which every boid and many
+  # tests depend on. Non-async modules run after all async ones, so no other test is
+  # reading the table when it goes away.
+  use ExUnit.Case, async: false
+
+  import Boids.AssertEventually
+
+  alias Boids.BoidPositions
+
+  test "kills the positions table owner, and its supervisor starts a new one" do
+    owner_pid_before = Process.whereis(BoidPositions)
+
+    assert Boids.kill_boid_positions_owner() == :ok
+
+    assert_eventually(fn ->
+      owner_pid = Process.whereis(BoidPositions)
+      is_pid(owner_pid) and owner_pid != owner_pid_before
+    end)
+
+    # The new owner has created a new, empty table under the same name.
+    assert_eventually(fn -> :ets.info(BoidPositions.table_name()) != :undefined end)
+  end
 end

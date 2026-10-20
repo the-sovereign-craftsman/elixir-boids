@@ -77,11 +77,14 @@ defmodule Boids.BoidServer do
     {:noreply, new_boid}
   end
 
-  # The boid's row is keyed by the cell of its last position, which is the state.
+  # The boid's row is keyed by the cell of its last position, which is the state. If
+  # the table's owner has just died, the table and this row are already gone.
   @impl true
   def terminate(_reason, boid) do
-    {cell_x, cell_y} = BoidSpatialGrid.cell_for_position(boid.position)
-    :ets.delete(BoidPositions.table_name(), {cell_x, cell_y, self()})
+    if :ets.whereis(BoidPositions.table_name()) != :undefined do
+      {cell_x, cell_y} = BoidSpatialGrid.cell_for_position(boid.position)
+      :ets.delete(BoidPositions.table_name(), {cell_x, cell_y, self()})
+    end
   end
 
   # :manual (set in config/test.exs) skips the timer so tests control every tick.

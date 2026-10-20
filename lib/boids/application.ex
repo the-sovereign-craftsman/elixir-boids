@@ -12,11 +12,11 @@ defmodule Boids.Application do
       Boids.Repo,
       {DNSCluster, query: Application.get_env(:boids, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Boids.PubSub},
-      Boids.BoidPositions,
+      # The positions table owner and the janitor, restarted together (rest_for_one).
+      # Before the boids, which write to the table and register with the janitor.
+      Boids.BoidPositionsSupervisor,
       # Before the boids, so the toggles table exists before any boid ticks.
       Boids.BoidFlockingRuleToggles,
-      # Before the boids, which register with it as they start.
-      Boids.BoidJanitor,
       # The default limit is 3 restarts in 5 seconds. Past it the supervisor gives up
       # and stops every boid, so killing even a handful at once would end the whole
       # flock. The failure demos kill hundreds, so the limit is raised far past that.

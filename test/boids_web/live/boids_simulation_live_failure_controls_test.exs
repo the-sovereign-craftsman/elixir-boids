@@ -36,7 +36,7 @@ defmodule BoidsWeb.BoidsSimulationLiveFailureControlsTest do
   end
 
   test "submitting the form kills that many boids, and they come back", %{conn: conn} do
-    Boids.spawn_boids(5)
+    spawn_watched_boids(5)
     pids_before_kill = running_boid_pids()
     crash_count_before = Boids.boid_crash_count()
     {:ok, view, _html} = live(conn, ~p"/")
@@ -49,7 +49,7 @@ defmodule BoidsWeb.BoidsSimulationLiveFailureControlsTest do
   end
 
   test "rejects 0 and kills nothing", %{conn: conn} do
-    Boids.spawn_boids(2)
+    spawn_watched_boids(2)
     crash_count_before = Boids.boid_crash_count()
     {:ok, view, _html} = live(conn, ~p"/")
 
@@ -71,7 +71,7 @@ defmodule BoidsWeb.BoidsSimulationLiveFailureControlsTest do
     end
 
     test "submitting the form corrupts that many boids", %{conn: conn} do
-      Boids.spawn_boids(4)
+      spawn_watched_boids(4)
       {:ok, view, _html} = live(conn, ~p"/")
 
       html = crash_boids(view, "3")
@@ -89,6 +89,14 @@ defmodule BoidsWeb.BoidsSimulationLiveFailureControlsTest do
 
       assert crash_boids(view, "0") =~ "Enter a whole number of boids, 1 or more."
       assert crash_boids(view, "abc") =~ "Enter a whole number of boids, 1 or more."
+    end
+  end
+
+  describe "positions table owner control" do
+    test "asks for confirmation before killing the table owner", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      assert has_element?(view, "#kill-boid-positions-owner-button[data-confirm]")
     end
   end
 

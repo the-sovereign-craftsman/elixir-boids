@@ -34,9 +34,12 @@ defmodule Boids.BoidJanitorTest do
       assert_eventually(fn -> BoidJanitor.crash_count() == crash_count_before + 1 end)
     end
 
+    # A real boid that raises still runs terminate/2 (it traps exits), which deletes its
+    # own row. So the janitor only counts it, and leaves the row alone. The stand-in has
+    # no terminate/2, which is how the test can see that the janitor didn't touch it.
     # The raise is logged as an error report; capture_log keeps it out of the test output.
     @tag :capture_log
-    test "counts a process that raises as a crash" do
+    test "counts a process that raises as a crash, and leaves its row to the process" do
       crash_count_before = BoidJanitor.crash_count()
       pid = start_stand_in_boid()
 
@@ -44,29 +47,34 @@ defmodule Boids.BoidJanitorTest do
       send(pid, :raise)
 
       assert_eventually(fn -> BoidJanitor.crash_count() == crash_count_before + 1 end)
-      assert rows_for(pid) == []
+      assert_janitor_handled_death(pid)
+      assert rows_for(pid) != []
     end
 
-    test "does not count a process that stops with :shutdown, but still deletes its row" do
+    # Boids removed on purpose stop with :shutdown and delete their own rows. Scanning
+    # the table for each one would make clearing 5,000 boids millions of row checks.
+    test "does not count a process that stops with :shutdown, and leaves its row to the process" do
       crash_count_before = BoidJanitor.crash_count()
       pid = start_stand_in_boid()
 
       watch_and_wait_for_janitor(pid)
       Process.exit(pid, :shutdown)
 
-      assert_eventually(fn -> rows_for(pid) == [] end)
+      assert_janitor_handled_death(pid)
       assert BoidJanitor.crash_count() == crash_count_before
+      assert rows_for(pid) != []
     end
 
-    test "does not count a process that stops normally" do
+    test "does not count a process that stops normally, and leaves its row to the process" do
       crash_count_before = BoidJanitor.crash_count()
       pid = start_stand_in_boid()
 
       watch_and_wait_for_janitor(pid)
       send(pid, :stop)
 
-      assert_eventually(fn -> rows_for(pid) == [] end)
+      assert_janitor_handled_death(pid)
       assert BoidJanitor.crash_count() == crash_count_before
+      assert rows_for(pid) != []
     end
 
     # The boid registers with a cast, so it can die before the janitor monitors it.
@@ -92,7 +100,7 @@ defmodule Boids.BoidJanitorTest do
       # :temporary, so the test supervisor doesn't restart it after the kill.
       pid = start_supervised!(Supervisor.child_spec({BoidServer, []}, restart: :temporary))
       # A synchronous call to the janitor, so the boid's registration cast is handled first.
-      _crash_count = BoidJanitor.crash_count()
+      :sys.get_state(BoidJanitor)
 
       Process.exit(pid, :kill)
 
@@ -119,10 +127,17 @@ defmodule Boids.BoidJanitorTest do
 
   # watch_boid/1 is a cast, so a process killed right after it can die before the janitor
   # monitors it (the :noproc case). A call from the same process is handled after the
-  # cast, so once it returns the janitor is watching.
+  # cast, so once :sys.get_state/1 returns the janitor is watching.
   defp watch_and_wait_for_janitor(pid) do
     BoidJanitor.watch_boid(pid)
-    _crash_count = BoidJanitor.crash_count()
+    :sys.get_state(BoidJanitor)
+  end
+
+  # The janitor drops a pid from the boids it watches once it has handled its :DOWN.
+  defp assert_janitor_handled_death(pid) do
+    assert_eventually(fn ->
+      not MapSet.member?(:sys.get_state(BoidJanitor).watched_boid_pids, pid)
+    end)
   end
 
   defp rows_for(pid) do

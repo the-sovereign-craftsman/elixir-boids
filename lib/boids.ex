@@ -116,6 +116,23 @@ defmodule Boids do
     :exit, _boid_already_dead -> false
   end
 
+  @doc """
+  Kills the process that owns the positions table, with `Process.exit(pid, :kill)`.
+  An ETS table is deleted when its owner dies, so every boid's row goes with it.
+  What happens next depends on the supervision tree, which is the point of the demo.
+  """
+  @spec kill_boid_positions_owner() :: :ok
+  def kill_boid_positions_owner do
+    case Process.whereis(BoidPositions) do
+      nil ->
+        :ok
+
+      owner_pid ->
+        Process.exit(owner_pid, :kill)
+        :ok
+    end
+  end
+
   @doc "Starts one CPU hog: a process that spins forever. See `Boids.CpuHog`."
   @spec start_cpu_hog() :: pid()
   def start_cpu_hog do
