@@ -43,7 +43,7 @@ defmodule Boids.SimulationMetrics do
           total_process_count: non_neg_integer(),
           tick_rate_hz: float(),
           restart_count: non_neg_integer(),
-          restarts_per_second: float(),
+          restarts_since_previous_sample: non_neg_integer(),
           scheduler_utilization_percent: float(),
           scheduler_utilization_percent_by_scheduler: [float()],
           total_memory_bytes: non_neg_integer(),
@@ -132,8 +132,10 @@ defmodule Boids.SimulationMetrics do
       total_process_count: current_sample.total_process_count,
       tick_rate_hz: tick_rate_per_boid(ticks_per_second, current_sample.boid_process_count),
       restart_count: current_sample.restart_count,
-      restarts_per_second:
-        per_second(current_sample.restart_count - previous_sample.restart_count, elapsed_seconds),
+      # A plain count rather than a rate: a mass kill restarts every boid within
+      # milliseconds, so it all lands in one sample either way.
+      restarts_since_previous_sample:
+        current_sample.restart_count - previous_sample.restart_count,
       scheduler_utilization_percent: scheduler_utilization_percent,
       scheduler_utilization_percent_by_scheduler: scheduler_utilization_percent_by_scheduler,
       total_memory_bytes: current_sample.total_memory_bytes,

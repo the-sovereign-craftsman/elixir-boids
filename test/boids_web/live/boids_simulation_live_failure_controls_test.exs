@@ -57,6 +57,41 @@ defmodule BoidsWeb.BoidsSimulationLiveFailureControlsTest do
     assert kill_boids(view, "abc") =~ "Enter a whole number of boids, 1 or more."
   end
 
+  describe "crash control" do
+    test "the crash count starts at 100", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      assert has_element?(view, "#crash-boids-form input[type='number'][value='100']")
+    end
+
+    test "submitting the form corrupts that many boids", %{conn: conn} do
+      Boids.spawn_boids(4)
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      html = crash_boids(view, "3")
+
+      assert html =~ "Corrupted 3 boids. They crash on their next tick."
+
+      corrupted_count =
+        Enum.count(running_boid_pids(), &match?(%{velocity: :corrupted}, :sys.get_state(&1)))
+
+      assert corrupted_count == 3
+    end
+
+    test "rejects 0 and input that isn't a whole number", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      assert crash_boids(view, "0") =~ "Enter a whole number of boids, 1 or more."
+      assert crash_boids(view, "abc") =~ "Enter a whole number of boids, 1 or more."
+    end
+  end
+
+  defp crash_boids(view, count) do
+    view
+    |> form("#crash-boids-form", crash_boids: %{count: count})
+    |> render_submit()
+  end
+
   defp kill_boids(view, count) do
     view
     |> form("#kill-boids-form", kill_boids: %{count: count})

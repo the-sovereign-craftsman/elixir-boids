@@ -34,7 +34,7 @@ defmodule Boids.SimulationMetricsTest do
       assert snapshot.tick_rate_hz == 0.0
     end
 
-    test "restarts per second is the restart count delta over elapsed time" do
+    test "counts the restarts since the previous sample" do
       snapshot =
         SimulationMetrics.build_snapshot(
           sample(sampled_at_ms: 0, restart_count: 0),
@@ -42,7 +42,7 @@ defmodule Boids.SimulationMetricsTest do
         )
 
       assert snapshot.restart_count == 5
-      assert snapshot.restarts_per_second == 5.0
+      assert snapshot.restarts_since_previous_sample == 5
     end
 
     test "memory per boid is process memory divided by process count" do
@@ -78,8 +78,9 @@ defmodule Boids.SimulationMetricsTest do
     end
 
     # Two samples can land in the same millisecond, like a sample sent by hand just as
-    # the timer fires. There's no time to divide by, so the rates are reported as 0.0.
-    test "rates are 0.0 when both samples were taken in the same millisecond" do
+    # the timer fires. There's no time to divide by, so the tick rate is reported as 0.0.
+    # Restarts are a plain count, so they're still counted.
+    test "tick rate is 0.0 when both samples were taken in the same millisecond" do
       snapshot =
         SimulationMetrics.build_snapshot(
           sample(sampled_at_ms: 500, tick_count: 0, restart_count: 0, boid_process_count: 10),
@@ -87,7 +88,7 @@ defmodule Boids.SimulationMetricsTest do
         )
 
       assert snapshot.tick_rate_hz == 0.0
-      assert snapshot.restarts_per_second == 0.0
+      assert snapshot.restarts_since_previous_sample == 2
     end
 
     test "counts are taken from the current sample" do

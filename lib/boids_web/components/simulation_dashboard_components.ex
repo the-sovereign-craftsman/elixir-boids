@@ -56,12 +56,17 @@ defmodule BoidsWeb.SimulationDashboardComponents do
         </div>
 
         <div>
-          <%!-- The last second's restarts lead, since they spike when boids are killed and
-               drop back to 0 as the supervisor catches up. The total only ever grows. --%>
-          <.metric_row id="restarts-per-second" label="Restarts / s">
-            {format_integer_with_commas(round(@snapshot.restarts_per_second))}
+          <%!-- Restarts finish within milliseconds, so a per-second figure is back to 0 a
+               second after a kill. The headline adds up the minute of history instead, so a
+               kill stays on screen until it scrolls out of the sparkline. The total only
+               ever grows. --%>
+          <.metric_row id="restarts-last-minute" label="Restarts (last min)">
+            {format_integer_with_commas(restarts_in_history(@history))}
           </.metric_row>
-          <.sparkline id="restarts-sparkline" values={metric_history(@history, :restarts_per_second)} />
+          <.sparkline
+            id="restarts-sparkline"
+            values={metric_history(@history, :restarts_since_previous_sample)}
+          />
           <.metric_row id="restart-count" label="Total restarts">
             {format_integer_with_commas(@snapshot.restart_count)}
           </.metric_row>
@@ -196,6 +201,13 @@ defmodule BoidsWeb.SimulationDashboardComponents do
   end
 
   defp metric_history(history, metric), do: Enum.map(history, &Map.fetch!(&1, metric))
+
+  # Every restart in the history window: up to the last minute, one sample per second.
+  defp restarts_in_history(history) do
+    history
+    |> metric_history(:restarts_since_previous_sample)
+    |> Enum.sum()
+  end
 
   # "29.0 / 30.3 Hz", or "29.0 Hz" when there is no target (ticks sent by hand in tests).
   defp tick_rate_text(tick_rate_hz, nil), do: "#{format_decimal(tick_rate_hz)} Hz"

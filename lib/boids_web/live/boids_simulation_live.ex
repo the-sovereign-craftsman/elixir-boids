@@ -33,6 +33,7 @@ defmodule BoidsWeb.BoidsSimulationLive do
      |> assign(:flocking_rule_descriptions, @flocking_rule_descriptions)
      |> assign_flocking_rule_toggles_form(Boids.flocking_rule_toggles())
      |> assign(:kill_boids_form, to_form(%{"count" => 100}, as: :kill_boids))
+     |> assign(:crash_boids_form, to_form(%{"count" => 100}, as: :crash_boids))
      |> assign(:max_boid_count, Boids.max_boid_count())
      |> assign_boid_count(Boids.boid_count())}
   end
@@ -120,6 +121,20 @@ defmodule BoidsWeb.BoidsSimulationLive do
               <.form for={@kill_boids_form} id="kill-boids-form" phx-submit="kill_boids">
                 <.input field={@kill_boids_form[:count]} type="number" label="Boids to kill" min="1" />
                 <.button id="kill-boids-button" class="btn btn-sm btn-error">Kill</.button>
+              </.form>
+
+              <p class="text-xs text-base-content/70">
+                Corrupt boids' state instead, so their own code crashes on the next tick.
+              </p>
+
+              <.form for={@crash_boids_form} id="crash-boids-form" phx-submit="crash_boids">
+                <.input
+                  field={@crash_boids_form[:count]}
+                  type="number"
+                  label="Boids to crash"
+                  min="1"
+                />
+                <.button id="crash-boids-button" class="btn btn-sm btn-warning">Crash</.button>
               </.form>
             </div>
           </section>
@@ -230,6 +245,24 @@ defmodule BoidsWeb.BoidsSimulationLive do
          socket
          |> assign(:kill_boids_form, to_form(%{"count" => kill_count}, as: :kill_boids))
          |> put_flash(:info, "Killed #{killed_count} boids.")}
+
+      _not_a_whole_number ->
+        {:noreply, put_flash(socket, :error, "Enter a whole number of boids, 1 or more.")}
+    end
+  end
+
+  def handle_event("crash_boids", %{"crash_boids" => %{"count" => count}}, socket) do
+    case Integer.parse(count) do
+      {crash_count, ""} when crash_count >= 1 ->
+        corrupted_count = Boids.crash_boids(crash_count)
+
+        {:noreply,
+         socket
+         |> assign(:crash_boids_form, to_form(%{"count" => crash_count}, as: :crash_boids))
+         |> put_flash(
+           :info,
+           "Corrupted #{corrupted_count} boids. They crash on their next tick."
+         )}
 
       _not_a_whole_number ->
         {:noreply, put_flash(socket, :error, "Enter a whole number of boids, 1 or more.")}

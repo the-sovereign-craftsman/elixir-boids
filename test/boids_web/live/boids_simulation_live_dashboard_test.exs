@@ -22,21 +22,30 @@ defmodule BoidsWeb.BoidsSimulationLiveDashboardTest do
     assert has_element?(view, "#boid-process-count", "4,812")
     assert has_element?(view, "#total-process-count", "5,231")
     assert has_element?(view, "#tick-rate", "29.7")
-    assert has_element?(view, "#restarts-per-second", "0")
+    assert has_element?(view, "#restarts-last-minute", "0")
     assert has_element?(view, "#restart-count", "0")
     assert has_element?(view, "#scheduler-utilization", "63%")
     assert has_element?(view, "#memory-usage", "182 MB")
     assert has_element?(view, "#memory-per-process", "2.8 KB")
   end
 
-  # The headline is the last second's restarts, which spikes when boids are killed and
-  # drops back to 0; the running total is shown under it.
-  test "leads with restarts in the last second, with the running total under it", %{conn: conn} do
+  # Restarts finish within milliseconds, so a per-second figure is back to 0 a second
+  # after a kill. The headline adds up the minute of history instead, so a kill stays on
+  # screen until it scrolls out of the sparklines. The running total is shown under it.
+  test "leads with the restarts in the last minute, with the running total under it",
+       %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/")
 
-    send_snapshot(view, snapshot(restarts_per_second: 4000.0, restart_count: 12_500))
+    history = [
+      snapshot(restarts_since_previous_sample: 0),
+      snapshot(restarts_since_previous_sample: 4000),
+      snapshot(restarts_since_previous_sample: 0, restart_count: 12_500)
+    ]
 
-    assert has_element?(view, "#restarts-per-second", "4,000")
+    send(view.pid, {:simulation_metrics_updated, List.last(history), history})
+    render(view)
+
+    assert has_element?(view, "#restarts-last-minute", "4,000")
     assert has_element?(view, "#restart-count", "12,500")
   end
 
@@ -89,7 +98,7 @@ defmodule BoidsWeb.BoidsSimulationLiveDashboardTest do
         total_process_count: 5231,
         tick_rate_hz: 29.7,
         restart_count: 0,
-        restarts_per_second: 0.0,
+        restarts_since_previous_sample: 0,
         scheduler_utilization_percent: 63.0,
         scheduler_utilization_percent_by_scheduler: [60.0, 66.0],
         total_memory_bytes: 182_000_000,

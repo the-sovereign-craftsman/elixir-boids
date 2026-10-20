@@ -64,4 +64,46 @@ defmodule Boids.BoidsFailureScenariosTest do
       assert Process.whereis(Boids.DynamicSupervisor) == supervisor_pid
     end
   end
+
+  # Ticks are sent by hand in tests (tick_interval_ms is :manual), so each test ticks the
+  # boids itself to make the corrupted ones run into their bad state. Each crash logs an
+  # error report, which capture_log keeps out of the test output.
+  describe "crash_boids/1" do
+    @tag :capture_log
+    test "corrupted boids crash on their next tick and the supervisor restarts them" do
+      Boids.spawn_boids(10)
+      pids_before_crash = running_boid_pids()
+      crash_count_before = Boids.boid_crash_count()
+
+      assert Boids.crash_boids(4) == 4
+      tick_every_boid(pids_before_crash)
+
+      assert_killed_boids_replaced(pids_before_crash, 4)
+      assert_eventually(fn -> Boids.boid_crash_count() == crash_count_before + 4 end)
+      assert_eventually(fn -> :ets.info(BoidPositions.table_name(), :size) == 10 end)
+    end
+
+    test "a corrupted boid keeps running until its next tick" do
+      Boids.spawn_boids(1)
+      [pid] = running_boid_pids()
+
+      Boids.crash_boids(1)
+
+      assert Process.alive?(pid)
+      assert %Boids.Boid{velocity: :corrupted} = :sys.get_state(pid)
+    end
+
+    @tag :capture_log
+    test "crashing more boids than exist crashes them all" do
+      Boids.spawn_boids(3)
+      pids_before_crash = running_boid_pids()
+
+      assert Boids.crash_boids(50) == 3
+      tick_every_boid(pids_before_crash)
+
+      assert_killed_boids_replaced(pids_before_crash, 3)
+    end
+  end
+
+  defp tick_every_boid(pids), do: Enum.each(pids, &send(&1, :tick))
 end

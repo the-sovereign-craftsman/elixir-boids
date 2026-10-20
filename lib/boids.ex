@@ -92,6 +92,31 @@ defmodule Boids do
         do: pid
   end
 
+  @doc """
+  Corrupts the state of `count` random boids, so each one crashes on its next tick:
+  a bug in the boid's own code, rather than a kill from outside.
+
+  `:sys.replace_state/2` swaps the boid's velocity for the atom `:corrupted`. The boid
+  keeps running until its next tick, when `Boids.Boid.advance_boid/3` can't match a
+  `{x, y}` velocity and raises. Its supervisor restarts it as a fresh boid, and
+  `Boids.BoidJanitor` counts the crash. Returns how many were corrupted.
+  """
+  @spec crash_boids(non_neg_integer()) :: non_neg_integer()
+  def crash_boids(count) when is_integer(count) and count >= 0 do
+    running_boid_pids()
+    |> Enum.take_random(count)
+    |> Enum.count(&corrupt_boid_state/1)
+  end
+
+  # :sys.replace_state/2 is a call to the boid, so it exits if the boid dies first (say,
+  # killed at the same moment). That boid is skipped rather than crashing the caller.
+  defp corrupt_boid_state(pid) do
+    :sys.replace_state(pid, fn boid -> %{boid | velocity: :corrupted} end)
+    true
+  catch
+    :exit, _boid_already_dead -> false
+  end
+
   @doc "How many boids have crashed or been killed. See `Boids.BoidJanitor`."
   defdelegate boid_crash_count(), to: BoidJanitor, as: :crash_count
 
