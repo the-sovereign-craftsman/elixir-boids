@@ -7,6 +7,13 @@ defmodule BoidsWeb.BoidsSimulationLiveTest do
   alias Boids.BoidPositions
 
   describe "mount" do
+    test "renders the project header", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      assert has_element?(view, "header h1", "Elixir Boids")
+      assert has_element?(view, ~s{header a[href="https://github.com/mikey-mdk/boids"]})
+    end
+
     test "renders the canvas wired to the hook", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/")
 

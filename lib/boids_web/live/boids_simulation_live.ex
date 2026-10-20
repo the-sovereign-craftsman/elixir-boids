@@ -4,6 +4,7 @@ defmodule BoidsWeb.BoidsSimulationLive do
   alias Boids.Boid
 
   @frame_interval_ms div(1000, 24)
+  @default_spawn_count "500"
 
   # Shown beside each toggle, in this order.
   @flocking_rule_descriptions [
@@ -22,7 +23,10 @@ defmodule BoidsWeb.BoidsSimulationLive do
     {:ok,
      socket
      |> assign(:flocking_rule_descriptions, @flocking_rule_descriptions)
-     |> assign_flocking_rule_toggles_form(Boids.flocking_rule_toggles())}
+     |> assign_flocking_rule_toggles_form(Boids.flocking_rule_toggles())
+     |> assign(:boid_count, Boids.boid_count())
+     |> assign(:max_boid_count, Boids.max_boid_count())
+     |> assign(:spawn_boids_form, to_form(%{"count" => @default_spawn_count}, as: :spawn_boids))}
   end
 
   @impl true
@@ -31,46 +35,72 @@ defmodule BoidsWeb.BoidsSimulationLive do
     <Layouts.app flash={@flash} wide>
       <%!-- Controls beside the canvas from md up; the telemetry column joins at xl. --%>
       <div class="grid items-start gap-6 md:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)_16rem]">
-        <section id="flocking-controls" class="card bg-base-200">
-          <div class="card-body gap-4">
-            <h2 class="card-title">Flocking rules</h2>
+        <div id="simulation-controls" class="flex flex-col gap-6">
+          <section id="boid-spawning" class="card bg-base-200">
+            <div class="card-body gap-4">
+              <h2 class="card-title">Boids</h2>
+              <p id="boid-count" class="text-sm">{@boid_count} / {@max_boid_count}</p>
 
-            <.form
-              for={@flocking_rule_toggles_form}
-              id="flocking-rule-toggles-form"
-              phx-change="update_flocking_rule_toggles"
-            >
-              <div :for={{rule, description} <- @flocking_rule_descriptions} class="mb-3">
+              <.form for={@spawn_boids_form} id="spawn-boids-form" phx-submit="spawn_boids">
                 <.input
-                  field={@flocking_rule_toggles_form[rule]}
-                  type="checkbox"
-                  label={rule |> Atom.to_string() |> String.capitalize()}
-                  class="toggle toggle-primary toggle-sm mr-2"
+                  field={@spawn_boids_form[:count]}
+                  type="number"
+                  label="How many to spawn"
+                  min="1"
+                  max={@max_boid_count}
                 />
-                <p class="text-xs text-base-content/70">{description}</p>
-              </div>
-            </.form>
-
-            <div class="flex gap-2">
-              <.button
-                id="enable-all-flocking-rules"
-                class="btn btn-sm btn-primary btn-soft"
-                phx-click="update_all_flocking_rule_toggles"
-                phx-value-enabled="true"
-              >
-                All on
-              </.button>
-              <.button
-                id="disable-all-flocking-rules"
-                class="btn btn-sm btn-soft"
-                phx-click="update_all_flocking_rule_toggles"
-                phx-value-enabled="false"
-              >
-                All off
-              </.button>
+                <.button
+                  id="spawn-boids-button"
+                  class="btn btn-sm btn-primary"
+                  disabled={@boid_count >= @max_boid_count}
+                >
+                  Spawn
+                </.button>
+              </.form>
             </div>
-          </div>
-        </section>
+          </section>
+
+          <section id="flocking-controls" class="card bg-base-200">
+            <div class="card-body gap-4">
+              <h2 class="card-title">Flocking rules</h2>
+
+              <.form
+                for={@flocking_rule_toggles_form}
+                id="flocking-rule-toggles-form"
+                phx-change="update_flocking_rule_toggles"
+              >
+                <div :for={{rule, description} <- @flocking_rule_descriptions} class="mb-3">
+                  <.input
+                    field={@flocking_rule_toggles_form[rule]}
+                    type="checkbox"
+                    label={rule |> Atom.to_string() |> String.capitalize()}
+                    class="toggle toggle-primary toggle-sm mr-2"
+                  />
+                  <p class="text-xs text-base-content/70">{description}</p>
+                </div>
+              </.form>
+
+              <div class="flex gap-2">
+                <.button
+                  id="enable-all-flocking-rules"
+                  class="btn btn-sm btn-primary btn-soft"
+                  phx-click="update_all_flocking_rule_toggles"
+                  phx-value-enabled="true"
+                >
+                  All on
+                </.button>
+                <.button
+                  id="disable-all-flocking-rules"
+                  class="btn btn-sm btn-soft"
+                  phx-click="update_all_flocking_rule_toggles"
+                  phx-value-enabled="false"
+                >
+                  All off
+                </.button>
+              </div>
+            </div>
+          </section>
+        </div>
 
         <canvas
           id="boid-canvas"
@@ -127,6 +157,23 @@ defmodule BoidsWeb.BoidsSimulationLive do
     {:noreply, socket}
   end
 
+  def handle_event("spawn_boids", %{"spawn_boids" => %{"count" => count} = spawn_params}, socket) do
+    socket = assign(socket, :spawn_boids_form, to_form(spawn_params, as: :spawn_boids))
+
+    case Integer.parse(count) do
+      {requested_count, ""} when requested_count > 0 ->
+        spawned_count = Boids.spawn_boids_up_to_limit(requested_count)
+
+        {:noreply,
+         socket
+         |> assign(:boid_count, Boids.boid_count())
+         |> put_spawn_flash(requested_count, spawned_count)}
+
+      _not_a_positive_whole_number ->
+        {:noreply, put_flash(socket, :error, "Enter a whole number of boids to spawn.")}
+    end
+  end
+
   def handle_event("update_all_flocking_rule_toggles", %{"enabled" => enabled}, socket) do
     Boids.update_all_flocking_rule_toggles(enabled == "true")
 
@@ -145,8 +192,24 @@ defmodule BoidsWeb.BoidsSimulationLive do
 
     Process.send_after(self(), :render_frame, @frame_interval_ms)
 
-    {:noreply, push_event(socket, "update_boid_positions", %{positions: positions})}
+    # Boids can also be spawned from iex, so the count is refreshed every frame. assign/3
+    # only marks it changed when the number differs, so a steady count re-renders nothing.
+    {:noreply,
+     socket
+     |> assign(:boid_count, Boids.boid_count())
+     |> push_event("update_boid_positions", %{positions: positions})}
   end
+
+  defp put_spawn_flash(socket, requested_count, spawned_count)
+       when spawned_count < requested_count do
+    put_flash(
+      socket,
+      :info,
+      "Spawned #{spawned_count} boids (the limit is #{Boids.max_boid_count()})."
+    )
+  end
+
+  defp put_spawn_flash(socket, _requested_count, _spawned_count), do: socket
 
   # Forms read their values like submitted params, which have string keys, so the
   # rule atoms (:cohesion) become strings ("cohesion") here.
