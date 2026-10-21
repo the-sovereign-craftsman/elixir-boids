@@ -11,7 +11,11 @@ defmodule BoidsWeb.BoidsSimulationLiveTest do
       {:ok, view, _html} = live(conn, ~p"/")
 
       assert has_element?(view, "header h1", "Elixir Boids")
-      assert has_element?(view, ~s{header a[href="https://github.com/the-sovereign-craftsman/elixir-boids"]})
+
+      assert has_element?(
+               view,
+               ~s{header a[href="https://github.com/the-sovereign-craftsman/elixir-boids"]}
+             )
     end
 
     test "renders the canvas wired to the hook", %{conn: conn} do
