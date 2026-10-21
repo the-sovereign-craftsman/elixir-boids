@@ -9,7 +9,6 @@ defmodule Boids.Application do
   def start(_type, _args) do
     children = [
       BoidsWeb.Telemetry,
-      Boids.Repo,
       {DNSCluster, query: Application.get_env(:boids, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Boids.PubSub},
       # The positions table owner and the janitor, restarted together (rest_for_one).

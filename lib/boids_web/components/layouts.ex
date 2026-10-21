@@ -53,7 +53,7 @@ defmodule BoidsWeb.Layouts do
 
         <div class="flex items-center gap-2">
           <a
-            href="https://github.com/mikey-mdk/boids"
+            href="https://github.com/mikey-mdk/elixir-boids"
             target="_blank"
             rel="noopener noreferrer"
             class="btn btn-ghost btn-sm"

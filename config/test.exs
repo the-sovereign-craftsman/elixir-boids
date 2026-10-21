@@ -1,18 +1,5 @@
 import Config
 
-# Configure your database
-#
-# The MIX_TEST_PARTITION environment variable can be used
-# to provide built-in test partitioning in CI environment.
-# Run `mix help test` for more information.
-config :boids, Boids.Repo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
-  database: "boids_test#{System.get_env("MIX_TEST_PARTITION")}",
-  pool: Ecto.Adapters.SQL.Sandbox,
-  pool_size: System.schedulers_online() * 2
-
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
 config :boids, BoidsWeb.Endpoint,
@@ -20,16 +7,10 @@ config :boids, BoidsWeb.Endpoint,
   secret_key_base: "kj8EZzta7DEPplAW7MjDYWXZVTsA4PHzs211O/1SiK9s2ch0Nn8j7vy6YFvhHfZ5",
   server: false
 
-# In test we don't send emails
-config :boids, Boids.Mailer, adapter: Swoosh.Adapters.Test
-
 config :boids, :boid_module, Boids.BoidMock
 
 # No timer-driven ticks in tests; tests send :tick themselves so they stay deterministic.
 config :boids, :tick_interval_ms, :manual
-
-# Disable swoosh api client as it is only required for production adapters
-config :swoosh, :api_client, false
 
 # Print only warnings and errors during test
 config :logger, level: :warning

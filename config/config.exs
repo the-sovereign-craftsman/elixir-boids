@@ -8,7 +8,6 @@
 import Config
 
 config :boids,
-  ecto_repos: [Boids.Repo],
   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint
@@ -26,15 +25,6 @@ config :boids, BoidsWeb.Endpoint,
 config :phoenix_live_view,
   # the attribute set on all root tags. Used for Phoenix.LiveView.ColocatedCSS.
   root_tag_attribute: "phx-r"
-
-# Configure the mailer
-#
-# By default it uses the "Local" adapter which stores the emails
-# locally. You can see the emails in your browser, at "/dev/mailbox".
-#
-# For production it's recommended to configure a different adapter
-# at the `config/runtime.exs`.
-config :boids, Boids.Mailer, adapter: Swoosh.Adapters.Local
 
 config :boids, boid_module: Boids.Boid
 

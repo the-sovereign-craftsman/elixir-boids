@@ -35,3 +35,6 @@ boids-*.tar
 npm-debug.log
 /assets/node_modules/
 
+
+# Trace config written by :observer / :ttb in dev.
+/ttb_last_config
