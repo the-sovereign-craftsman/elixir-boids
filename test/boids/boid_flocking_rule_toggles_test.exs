@@ -46,18 +46,18 @@ defmodule Boids.BoidFlockingRuleTogglesTest do
     end
 
     test "turns a rule on without changing the other rules" do
-      BoidFlockingRuleToggles.update_flocking_rule_toggles(:cohesion, true)
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:separation, true)
 
       assert BoidFlockingRuleToggles.flocking_rule_toggles() == %{
-               separation: false,
-               cohesion: true,
+               separation: true,
+               cohesion: false,
                alignment: false
              }
     end
 
     test "turns a rule back off" do
-      BoidFlockingRuleToggles.update_flocking_rule_toggles(:alignment, true)
-      BoidFlockingRuleToggles.update_flocking_rule_toggles(:alignment, false)
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:separation, true)
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:separation, false)
 
       assert BoidFlockingRuleToggles.flocking_rule_toggles() == %{
                separation: false,
@@ -131,7 +131,7 @@ defmodule Boids.BoidFlockingRuleTogglesTest do
     end
 
     test "overrides a mix of rules that were on and off" do
-      BoidFlockingRuleToggles.update_flocking_rule_toggles(:cohesion, true)
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:separation, true)
 
       BoidFlockingRuleToggles.update_all_flocking_rule_toggles(true)
 
@@ -150,26 +150,103 @@ defmodule Boids.BoidFlockingRuleTogglesTest do
     end
   end
 
+  # Separation is the only rule that pushes boids apart. Without it, cohesion pulls the
+  # flock together and alignment lets groups merge and never split, so the flock packs
+  # tighter and tighter, every boid's neighbor list grows, and memory runs out. So the
+  # toggles never hold cohesion or alignment without separation: the change that would
+  # create that combination brings the other rules along.
+  describe "keeping the flock from collapsing" do
+    test "turning cohesion on also turns separation on" do
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:cohesion, true)
+
+      assert BoidFlockingRuleToggles.flocking_rule_toggles() ==
+               %{separation: true, cohesion: true, alignment: false}
+    end
+
+    test "turning alignment on also turns separation on" do
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:alignment, true)
+
+      assert BoidFlockingRuleToggles.flocking_rule_toggles() ==
+               %{separation: true, cohesion: false, alignment: true}
+    end
+
+    test "turning separation off also turns cohesion and alignment off" do
+      BoidFlockingRuleToggles.update_all_flocking_rule_toggles(true)
+
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:separation, false)
+
+      assert BoidFlockingRuleToggles.flocking_rule_toggles() ==
+               %{separation: false, cohesion: false, alignment: false}
+    end
+
+    test "turning cohesion off leaves separation on" do
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:cohesion, true)
+
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:cohesion, false)
+
+      assert BoidFlockingRuleToggles.flocking_rule_toggles() ==
+               %{separation: true, cohesion: false, alignment: false}
+    end
+
+    test "turning alignment off leaves separation on" do
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:alignment, true)
+
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:alignment, false)
+
+      assert BoidFlockingRuleToggles.flocking_rule_toggles() ==
+               %{separation: true, cohesion: false, alignment: false}
+    end
+
+    test "turning separation on leaves cohesion and alignment off" do
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:separation, true)
+
+      assert BoidFlockingRuleToggles.flocking_rule_toggles() ==
+               %{separation: true, cohesion: false, alignment: false}
+    end
+
+    test "subscribers get the adjusted state, in a single update" do
+      :ok = BoidFlockingRuleToggles.subscribe_to_flocking_rule_toggles()
+
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:alignment, true)
+
+      assert_receive {:flocking_rule_toggles_updated,
+                      %{separation: true, cohesion: false, alignment: true}}
+
+      refute_receive {:flocking_rule_toggles_updated, _another_update}
+    end
+
+    test "never holds cohesion or alignment without separation, whatever the order of changes" do
+      for _change <- 1..300 do
+        rule = Enum.random([:separation, :cohesion, :alignment])
+        BoidFlockingRuleToggles.update_flocking_rule_toggles(rule, Enum.random([true, false]))
+
+        toggles = BoidFlockingRuleToggles.flocking_rule_toggles()
+
+        refute (toggles.cohesion or toggles.alignment) and not toggles.separation,
+               "unsafe toggles: #{inspect(toggles)}"
+      end
+    end
+  end
+
   describe "subscribe_to_flocking_rule_toggles/0" do
     test "subscribers get the new state of every rule after a change" do
       :ok = BoidFlockingRuleToggles.subscribe_to_flocking_rule_toggles()
 
-      BoidFlockingRuleToggles.update_flocking_rule_toggles(:cohesion, true)
+      BoidFlockingRuleToggles.update_flocking_rule_toggles(:separation, true)
 
       assert_receive {:flocking_rule_toggles_updated,
-                      %{separation: false, cohesion: true, alignment: false}}
+                      %{separation: true, cohesion: false, alignment: false}}
     end
 
-    test "turning every rule on sends one update per rule, ending with all on" do
+    test "turning every rule on sends a single update, with every rule on" do
       :ok = BoidFlockingRuleToggles.subscribe_to_flocking_rule_toggles()
 
       BoidFlockingRuleToggles.update_all_flocking_rule_toggles(true)
 
-      assert_receive {:flocking_rule_toggles_updated, _first_update}
-      assert_receive {:flocking_rule_toggles_updated, _second_update}
-
       assert_receive {:flocking_rule_toggles_updated,
                       %{separation: true, cohesion: true, alignment: true}}
+
+      refute_receive {:flocking_rule_toggles_updated, _another_update}
     end
 
     test "a rejected change sends nothing" do

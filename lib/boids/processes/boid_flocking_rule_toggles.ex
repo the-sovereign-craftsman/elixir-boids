@@ -16,6 +16,15 @@ defmodule Boids.BoidFlockingRuleToggles do
   Every change is broadcast on `Boids.PubSub`, so anything showing the toggles
   (like the LiveView) stays in sync, whether the change came from the page or
   from iex. Subscribe with `subscribe_to_flocking_rule_toggles/0`.
+
+  The toggles never hold cohesion or alignment on with separation off. Separation
+  is the only rule that pushes boids apart. Without it, cohesion pulls the flock
+  together, and alignment lets groups that share a heading merge and never split
+  (and pins them against the walls). Either way the flock packs tighter and
+  tighter, every boid's neighbor list keeps growing, and the copies of all those
+  neighbors use up the machine's memory. So turning cohesion or alignment on also
+  turns separation on, and turning separation off also turns cohesion and
+  alignment off.
   """
 
   use GenServer
@@ -48,20 +57,21 @@ defmodule Boids.BoidFlockingRuleToggles do
   end
 
   @doc """
-  Turns every flocking rule on or off at once.
+  Turns every flocking rule on or off at once, as a single change with a single
+  broadcast.
 
-  Updates each rule in turn through `update_flocking_rule_toggles/2`. Only
-  accepts a boolean; anything else raises `FunctionClauseError` before any rule
-  changes.
+  Only accepts a boolean; anything else raises `FunctionClauseError` before any
+  rule changes.
   """
   @spec update_all_flocking_rule_toggles(boolean()) :: :ok
   def update_all_flocking_rule_toggles(enabled?) when is_boolean(enabled?) do
-    @flocking_rules
-    |> Enum.each(fn rule -> update_flocking_rule_toggles(rule, enabled?) end)
+    GenServer.call(__MODULE__, {:set_all_flocking_rules_enabled, enabled?})
   end
 
   @doc """
-  Turns one flocking rule on or off.
+  Turns one flocking rule on or off. Turning cohesion or alignment on also turns
+  separation on, and turning separation off also turns cohesion and alignment off
+  (see the moduledoc).
 
   Only accepts a known rule and a boolean. Anything else raises
   `FunctionClauseError` here, in the caller, before reaching this process.
@@ -107,19 +117,43 @@ defmodule Boids.BoidFlockingRuleToggles do
 
   @impl true
   def handle_call({:set_flocking_rule_enabled, rule, enabled?}, _from, state) do
-    [{@enabled_flocking_rules_key, enabled_flocking_rules}] =
-      :ets.lookup(@table_name, @enabled_flocking_rules_key)
+    flocking_rule_toggles()
+    |> Map.put(rule, enabled?)
+    |> keep_flock_from_collapsing(rule)
+    |> save_and_broadcast()
 
-    updated_flocking_rules = Map.put(enabled_flocking_rules, rule, enabled?)
+    {:reply, :ok, state}
+  end
 
-    :ets.insert(@table_name, {@enabled_flocking_rules_key, updated_flocking_rules})
+  def handle_call({:set_all_flocking_rules_enabled, enabled?}, _from, state) do
+    @flocking_rules
+    |> Map.new(fn rule -> {rule, enabled?} end)
+    |> save_and_broadcast()
+
+    {:reply, :ok, state}
+  end
+
+  # Cohesion or alignment without separation collapses the flock (see the moduledoc), so
+  # the rule that was just changed decides which way to fix it: turning cohesion or
+  # alignment on brings separation with it, and turning separation off takes cohesion
+  # and alignment with it.
+  defp keep_flock_from_collapsing(toggles, changed_rule) do
+    cond do
+      toggles.separation or not needs_separation?(toggles) -> toggles
+      changed_rule == :separation -> %{toggles | cohesion: false, alignment: false}
+      true -> %{toggles | separation: true}
+    end
+  end
+
+  defp needs_separation?(toggles), do: toggles.cohesion or toggles.alignment
+
+  defp save_and_broadcast(enabled_flocking_rules) do
+    :ets.insert(@table_name, {@enabled_flocking_rules_key, enabled_flocking_rules})
 
     Phoenix.PubSub.broadcast(
       Boids.PubSub,
       @pubsub_topic,
-      {:flocking_rule_toggles_updated, updated_flocking_rules}
+      {:flocking_rule_toggles_updated, enabled_flocking_rules}
     )
-
-    {:reply, :ok, state}
   end
 end

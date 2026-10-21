@@ -32,21 +32,21 @@ defmodule BoidsWeb.BoidsSimulationLiveFlockingControlsTest do
     end
 
     test "shows a rule that is already on as checked when the page loads", %{conn: conn} do
-      Boids.update_flocking_rule_toggles(:cohesion, true)
+      Boids.update_flocking_rule_toggles(:separation, true)
 
       {:ok, view, _html} = live(conn, ~p"/")
 
-      assert has_element?(view, toggle_selector("cohesion") <> "[checked]")
-      refute has_element?(view, toggle_selector("separation") <> "[checked]")
+      assert has_element?(view, toggle_selector("separation") <> "[checked]")
+      refute has_element?(view, toggle_selector("cohesion") <> "[checked]")
     end
 
     test "turning a toggle on turns the rule on", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/")
 
-      change_toggles(view, %{separation: "false", cohesion: "true", alignment: "false"})
+      change_toggles(view, %{separation: "true", cohesion: "false", alignment: "false"})
 
       assert BoidFlockingRuleToggles.flocking_rule_toggles() ==
-               %{separation: false, cohesion: true, alignment: false}
+               %{separation: true, cohesion: false, alignment: false}
     end
 
     test "turning a toggle off turns the rule off", %{conn: conn} do
@@ -76,6 +76,55 @@ defmodule BoidsWeb.BoidsSimulationLiveFlockingControlsTest do
 
       render(view)
       assert has_element?(view, toggle_selector("alignment") <> "[checked]")
+    end
+  end
+
+  # The toggles never allow cohesion or alignment without separation (see
+  # Boids.BoidFlockingRuleToggles). The page says so when it adjusts a change.
+  describe "keeping the flock from collapsing" do
+    test "turning cohesion on alone also turns separation on, and says why", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      html = change_toggles(view, %{separation: "false", cohesion: "true", alignment: "false"})
+
+      assert html =~ "Separation was turned on too"
+      render(view)
+      assert has_element?(view, toggle_selector("separation") <> "[checked]")
+      assert has_element?(view, toggle_selector("cohesion") <> "[checked]")
+    end
+
+    test "turning alignment on alone also turns separation on, and says why", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      html = change_toggles(view, %{separation: "false", cohesion: "false", alignment: "true"})
+
+      assert html =~ "Separation was turned on too"
+      render(view)
+      assert has_element?(view, toggle_selector("separation") <> "[checked]")
+      assert has_element?(view, toggle_selector("alignment") <> "[checked]")
+    end
+
+    test "turning separation off also turns cohesion and alignment off, and says why",
+         %{conn: conn} do
+      Boids.update_all_flocking_rule_toggles(true)
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      html = change_toggles(view, %{separation: "false", cohesion: "true", alignment: "true"})
+
+      assert html =~ "Cohesion and alignment were turned off too"
+      render(view)
+      refute has_element?(view, toggle_selector("separation") <> "[checked]")
+      refute has_element?(view, toggle_selector("cohesion") <> "[checked]")
+      refute has_element?(view, toggle_selector("alignment") <> "[checked]")
+    end
+
+    test "says nothing when a change needs no adjusting", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      html = change_toggles(view, %{separation: "true", cohesion: "false", alignment: "false"})
+
+      refute html =~ "turned on too"
+      refute html =~ "turned off too"
     end
   end
 

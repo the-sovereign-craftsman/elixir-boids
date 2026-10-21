@@ -250,7 +250,9 @@ defmodule BoidsWeb.BoidsSimulationLive do
   end
 
   # Only writes the change. The switches re-render when the broadcast comes back
-  # (handle_info/2 below), the same way they do for a change made from iex.
+  # (handle_info/2 below), the same way they do for a change made from iex. The toggles
+  # never allow cohesion or alignment without separation, so the result can differ from
+  # what was asked for; the flash explains when it does.
   @impl true
   def handle_event(
         "update_flocking_rule_toggles",
@@ -259,15 +261,22 @@ defmodule BoidsWeb.BoidsSimulationLive do
       ) do
     current_flocking_rule_toggles = Boids.flocking_rule_toggles()
 
-    for {rule, _description} <- @flocking_rule_descriptions do
-      enabled? = Map.get(toggle_params, Atom.to_string(rule)) == "true"
+    requested_flocking_rule_toggles =
+      Map.new(@flocking_rule_descriptions, fn {rule, _description} ->
+        {rule, Map.get(toggle_params, Atom.to_string(rule)) == "true"}
+      end)
 
-      if enabled? != Map.fetch!(current_flocking_rule_toggles, rule) do
-        Boids.update_flocking_rule_toggles(rule, enabled?)
-      end
+    for {rule, enabled?} <- requested_flocking_rule_toggles,
+        enabled? != Map.fetch!(current_flocking_rule_toggles, rule) do
+      Boids.update_flocking_rule_toggles(rule, enabled?)
     end
 
-    {:noreply, socket}
+    {:noreply,
+     put_collapse_guard_flash(
+       socket,
+       requested_flocking_rule_toggles,
+       Boids.flocking_rule_toggles()
+     )}
   end
 
   def handle_event("set_flock_size", %{"flock_size" => %{"count" => count}}, socket) do
@@ -398,6 +407,33 @@ defmodule BoidsWeb.BoidsSimulationLive do
     age_ms = now_ms - spawned_at_ms
     Float.round(max(1 - age_ms / @new_boid_highlight_ms, 0.0), 2)
   end
+
+  # Cohesion or alignment without separation collapses the flock, so the toggles adjust
+  # such a change (see Boids.BoidFlockingRuleToggles). Explains the adjustment when one
+  # was made.
+  defp put_collapse_guard_flash(socket, requested_toggles, resulting_toggles) do
+    cond do
+      not collapses_flock?(requested_toggles) ->
+        socket
+
+      resulting_toggles.separation ->
+        put_flash(
+          socket,
+          :info,
+          "Separation was turned on too: without it, cohesion and alignment pack the flock tighter and tighter until memory runs out."
+        )
+
+      true ->
+        put_flash(
+          socket,
+          :info,
+          "Cohesion and alignment were turned off too: without separation they pack the flock tighter and tighter until memory runs out."
+        )
+    end
+  end
+
+  defp collapses_flock?(toggles),
+    do: (toggles.cohesion or toggles.alignment) and not toggles.separation
 
   defp put_limit_flash(socket, target_count) do
     max_boid_count = Boids.max_boid_count()
