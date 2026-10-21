@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/the-sovereign-craftsman/elixir-boids/actions/workflows/ci.yml/badge.svg)](https://github.com/the-sovereign-craftsman/elixir-boids/actions/workflows/ci.yml)
 
-A flocking simulation where **every boid is its own Erlang process**: 5,000 independent processes, each ticking 30 times a second, rendered live in the browser with Phoenix LiveView.
+A flocking simulation where **every boid is its own Erlang process**. 5,000 independent processes, each ticking 30 times a second, rendered live in the browser with Phoenix LiveView.
 
 It's a hands-on example of Elixir concurrency and the features the BEAM gives you for free: **lightweight processes**, **preemptive scheduling**, **supervision trees** and **"let it crash"** fault tolerance. Kill thousands of boids and their supervisor brings them back. Corrupt their state and they crash and heal. Start processes that spin forever and the scheduler keeps the flock moving anyway. A live dashboard shows what the VM is doing the whole time.
 
