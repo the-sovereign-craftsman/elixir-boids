@@ -55,7 +55,7 @@ Each scenario demonstrates one part of OTP. Boids that were just restarted flash
 
 ## Why only 5,000 boids?
 
-The BEAM is known for running millions of processes, and it can: an idle process costs about 2.6 KB, and a million of them start in just over a second. What limits this demo is the **work each process does**, not the number of processes.
+The BEAM is known for running millions of processes, and it can. An idle process costs about 2.6 KB, and a million of them start in just over a second. What limits this demo is the **work each process does**, not the number of processes.
 
 Every boid is busy all the time. Thirty times a second, each one wakes up, copies its neighbors out of ETS and computes a new velocity. At 5,000 boids that's 150,000 wakeups a second, enough to keep most of the cores on a multi-core machine busy. Adding boids makes it worse faster than you'd expect. As the arena gets denser, each boid has more neighbors to process. Double the flock and the work roughly quadruples. Any runtime doing this much computation per entity hits the same wall.
 
