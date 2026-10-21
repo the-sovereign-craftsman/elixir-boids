@@ -106,7 +106,7 @@ Boids.Supervisor (one_for_one)
 
 Why the system is built the way it is, measured at 5,000 boids.
 
-- **Every boid is a process, and processes share nothing.** Each `BoidServer` has its own heap and is garbage-collected on its own, so a boid crashing or being killed affects nothing but itself. That isolation is what makes "let it crash" safe here: there's no shared state for a failure to corrupt.
+- **Every boid is a process, and processes share nothing.** Each `BoidServer` has its own heap and is garbage-collected on its own, so a boid crashing or being killed affects nothing but itself. That isolation is what makes "let it crash" safe here. There's no shared state for a failure to corrupt.
 - **Reads from ETS copy data, so the app copies as little as possible.** Reading a row copies it into the reading process's heap. With every flocking rule off, boids skip the neighbor lookup entirely, because copying neighbors nobody uses was most of the cost (about 1.2 GB of memory and 45% CPU, against 230 MB and 7% without it).
 - **Neighbors are filtered inside ETS.** The distance check runs inside the table as a match spec, so only real neighbors are copied out, not every row in the 9 surrounding cells. That more than halves memory with every rule on (1.8 GB to 0.8 GB).
 - **Cohesion and alignment require separation.** Separation is the only rule that pushes boids apart. Cohesion pulls them together, and alignment lets groups merge and never split. Without separation, density climbs without limit, and so does the work of copying neighbors. With alignment alone, the busiest grid cell went from 27 boids to over 500 and memory reached 3 GB in 20 seconds. The rule toggles enforce this, turning separation on or the other rules off as needed.
