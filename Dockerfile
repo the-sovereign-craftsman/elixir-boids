@@ -94,7 +94,7 @@ RUN chown nobody /app
 # set runner ENV
 ENV MIX_ENV="prod"
 
-# Meant to be run locally: `docker run --rm -p 4000:4000 ghcr.io/mikey-mdk/elixir-boids`,
+# Meant to be run locally: `docker run --rm -p 4000:4000 ghcr.io/the-sovereign-craftsman/elixir-boids`,
 # then open http://localhost:4000. The LiveView websocket only accepts pages served
 # from PHX_HOST, so it's localhost here, and the startup log prints that address. A
 # hosted deploy sets its own. bin/server generates SECRET_KEY_BASE when none is given.
