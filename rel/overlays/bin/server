@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+cd -P -- "$(dirname -- "$0")"
+
+# Phoenix needs a secret key to sign cookies. When none is given, generate a one-off key,
+# so `docker run` works with no setup. Nothing here needs it to survive a restart: the
+# app has no logins and stores nothing. A hosted deploy should still set its own.
+if [ -z "${SECRET_KEY_BASE:-}" ]; then
+  SECRET_KEY_BASE="$(head -c 48 /dev/urandom | base64 | tr -d '\n')"
+  export SECRET_KEY_BASE
+fi
+
+# The BEAM shuts down cleanly on SIGTERM, but on SIGINT (Ctrl+C) it opens its BREAK menu
+# and waits for a key, which looks like a hang in `docker run`. So instead of exec'ing
+# the release, this script stays running and turns either signal into a SIGTERM.
+PHX_SERVER=true ./boids start &
+beam_pid=$!
+trap 'kill -TERM "$beam_pid" 2>/dev/null || true' INT TERM
+
+# A trapped signal interrupts `wait`, so keep waiting until the BEAM has really exited.
+exit_status=0
+while kill -0 "$beam_pid" 2>/dev/null; do
+  wait "$beam_pid" && exit_status=0 || exit_status=$?
+done
+exit "$exit_status"

@@ -36,3 +36,118 @@ jobs:
       - run: mix format --check-formatted
       - run: mix credo --strict
       - run: mix test
+
+  # Builds the image for each CPU architecture on a native runner (emulating ARM is slow
+  # and unreliable for the BEAM), checks that it actually serves the demo, and pushes it
+  # by digest. Only after the tests pass, and only for main.
+  image:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build for the smoke test
+        uses: docker/build-push-action@v6
+        with:
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: elixir-boids:smoke-test
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+
+      # Runs the image the way the README tells people to, then checks the page loads, the
+      # startup log points at the right address, the LiveView websocket accepts a page
+      # from localhost, and Ctrl+C stops it.
+      - name: Smoke test
+        run: |
+          docker run -d --name boids -p 4000:4000 elixir-boids:smoke-test
+          for attempt in $(seq 1 30); do
+            curl -fsS -o /dev/null http://localhost:4000/ && break
+            sleep 1
+          done
+          curl -fsS http://localhost:4000/ | grep -q 'id="boid-canvas"'
+          docker logs boids 2>&1 | grep -q "Access BoidsWeb.Endpoint at http://localhost:4000"
+          websocket_status=$(curl -s --http1.1 -o /dev/null -w '%{http_code}' --max-time 2 \
+            -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" \
+            -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" -H "Origin: http://localhost:4000" \
+            "http://localhost:4000/live/websocket?vsn=2.0.0" || true)
+          test "$websocket_status" = "101"
+          docker kill --signal=INT boids
+          timeout 15 docker wait boids
+          docker logs boids | tail -20
+
+      - name: Container logs
+        if: failure()
+        run: docker logs boids || true
+
+      # The same build again, served from the cache, pushed without a tag. The publish
+      # job tags the digests from both architectures as one image.
+      - name: Push by digest
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.platform }}
+
+      - name: Save the digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.push.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ strategy.job-index }}
+          path: /tmp/digests/*
+
+  publish:
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # One tag that points at both architectures; Docker pulls the one that matches.
+      - name: Tag latest and the commit
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            -t "$IMAGE:latest" -t "$IMAGE:${{ github.sha }}" \
+            $(printf "$IMAGE@sha256:%s " *)
