@@ -18,7 +18,21 @@ docker run --rm -p 4000:4000 ghcr.io/the-sovereign-craftsman/elixir-boids
 
 Then open **http://localhost:4000**. Press `Ctrl+C` in the terminal to stop it.
 
-> Don't have Docker? Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows, Mac or Linux), start it once, then run the command above.
+<details>
+<summary><b>New to Docker? Step by step</b></summary>
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows, Mac or Linux) and open it. Wait until it says **Engine running** in the bottom-left corner.
+2. Open a terminal:
+   - **Windows:** press the Start button, type **PowerShell**, press Enter.
+   - **Mac:** press ⌘ + Space, type **Terminal**, press Enter.
+3. Copy this line, paste it into the window, and press Enter:
+   ```
+   docker run --rm -p 4000:4000 ghcr.io/the-sovereign-craftsman/elixir-boids
+   ```
+4. The first time, it downloads for a minute. When you see **Access BoidsWeb.Endpoint at http://localhost:4000**, open that address in your browser.
+5. To stop it, go back to the terminal window and press **Ctrl + C**.
+
+</details>
 
 ### From source
 
