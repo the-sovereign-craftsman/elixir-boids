@@ -6,7 +6,7 @@ A flocking simulation where **every boid is its own Erlang process**. 5,000 inde
 
 It's a hands-on example of Elixir concurrency and the features the BEAM gives you for free: **lightweight processes**, **preemptive scheduling**, **supervision trees** and **"let it crash"** fault tolerance. Kill thousands of boids and their supervisor brings them back. Corrupt their state and they crash and heal. Start processes that spin forever and the scheduler keeps the flock moving anyway. A live dashboard shows what the VM is doing the whole time.
 
-<!-- TODO(gif): hero shot. 5,000 boids, all rules on, dashboard visible. -->
+https://github.com/user-attachments/assets/05f08651-76c2-4861-8e4a-0de762f83194
 
 ## Run it
 
