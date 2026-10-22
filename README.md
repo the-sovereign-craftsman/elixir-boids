@@ -65,9 +65,18 @@ Each scenario demonstrates one part of OTP. Boids that were just restarted flash
 | **Kill boids** | Random boid processes are killed outright (`Process.exit(pid, :kill)`). | The `DynamicSupervisor` starts a replacement for each one immediately. The process count holds at 5,000 while "Restarts" climbs. |
 | **Crash boids** | Boids' state is corrupted, so their own code raises on the next tick. | "Let it crash". No defensive code, no try/rescue. The failure stays inside one process, and the supervisor restarts it with fresh state. |
 | **CPU hogs** | Processes that loop forever, never waiting or yielding. Start one, or one per core. | Preemptive scheduling. The BEAM switches processes after a fixed budget of work, so a hog can't starve the boids. The stacked CPU bar fills, and the flock keeps moving. |
-| **Kill the positions table owner** | Kills the process that owns the ETS table holding every boid's position. | ETS tables die with their owner. A `rest_for_one` supervisor restarts the table and its cleanup process together, and the boids repopulate it on their next tick. |
+| **Kill the positions table owner** | Kills the process that owns the ETS table holding every boid's position. | ETS tables die with their owner. A `rest_for_one` supervisor restarts the table and its cleanup process together. Boids that tick in the moment the table is missing crash, and their supervisor restarts them too. The rest repopulate the new table on their next tick. |
 
-<!-- TODO(gif): one clip per scenario. -->
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/kill-boids.gif" alt="Killing 4,000 of 5,000 boids: they flash red as their supervisor replaces them, and the process count holds at 5,000"><br><b>Kill boids</b></td>
+    <td width="50%"><img src="docs/images/crash-boids.gif" alt="Crashing 1,000 boids by corrupting their state: they crash, restart and flash red among the rest of the flock"><br><b>Crash boids</b></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/cpu-hogs.gif" alt="Starting one CPU hog per core: CPU goes to 100% and hogs do 85% of the work, while the tick rate stays at 29 Hz"><br><b>CPU hogs</b></td>
+    <td width="50%"><img src="docs/images/kill-table-owner.gif" alt="Killing the positions table owner: the table is recreated, and the boids that hit the gap crash and restart"><br><b>Kill the positions table owner</b></td>
+  </tr>
+</table>
 
 ## Why only 5,000 boids?
 
