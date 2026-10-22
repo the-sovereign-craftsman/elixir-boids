@@ -98,8 +98,8 @@ The cap is set at 5,000 so the simulation stays smooth on an ordinary laptop, wi
 
 Each boid is a `GenServer` (`Boids.BoidServer`). About 30 times a second it:
 
-1. finds its neighbors,
-2. computes its new velocity from the enabled flocking rules (pure functions in `Boids.BoidFlockingRules`),
+1. finds its neighbors.
+2. computes its new velocity from the enabled flocking rules (pure functions in `Boids.BoidFlockingRules`).
 3. writes its new position to a shared ETS table.
 
 No boid ever messages another. They coordinate only through that table, the same way real birds only watch each other.
