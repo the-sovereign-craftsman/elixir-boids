@@ -54,6 +54,8 @@ Then open **http://localhost:4000**. There's no database or other service to set
    - **Cohesion** steers toward the center of nearby boids.
 3. **Break things** with the controls under the canvas, and watch the dashboard.
 
+![Turning on separation, cohesion and alignment one at a time with 500 boids](docs/images/flocking-rules.gif)
+
 ## Break things
 
 Each scenario demonstrates one part of OTP. Boids that were just restarted flash red, so you can see the recovery happen.
